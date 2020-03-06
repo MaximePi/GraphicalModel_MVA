@@ -1,0 +1,5 @@
+A FAIRE
+
+Faire tourner transformations sur tout le folder d'images
+
+Creer un script .py qui pour une image transformée du folder MSRC_ObjCategImageDatabase_v2/Decomposed_Images importe le file pickle et crée le FSG graph du papier.
