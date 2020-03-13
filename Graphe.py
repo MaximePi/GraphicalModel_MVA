@@ -3,21 +3,29 @@ import cv2
 import numpy as np
 import os
 import scipy.stats
+import scipy.ndimage
 import skimage.feature
 from math import sqrt
-from matplotlib import pyplot as plt
 
 class SuperPixel:
-    def __init__(self,mask,im_shape:tuple):
+    def __init__(self,mask,im_shape:tuple,features):
         self.mask = mask ## coordinates ofthe pixels belonging to the superpixel, shape (N_pixel,2)
         self.im_shape = im_shape # shape of size of the original image
+        self.feature = features
+        self.id = 0
+
+    def set_id(self, id):
+        self.id = id
     
+    def get_id(self):
+      return self.id
+
     def add_feature(self, features):
         self.feature = features
     
-    def get_mask(self):
-        return self.mask
-        
+    def get_features(self):
+        return self.feature
+
 class FSG:
     def __init__(self, original_image):
         self.leaf_vertices = []
@@ -32,21 +40,31 @@ class FSG:
 
     def get_edges(self):
         return self.edges
-    
-    def get_leaves(self):
-        return self.leaf_vertices
+
+    def get_nb_leaves(self):
+        return len(self.leaf_vertices)
+
+    def get_nb_parents(self):
+        return len(self.parent_vertices)
+
+    def get_leaves(self, i):
+        return self.leaf_vertices[i]
+
+    def get_parent(self, i):
+        return self.parent_vertices[i]
+
+    def change_leaf(self, i, pixel:SuperPixel):
+        self.leaf_vertices[i] =pixel
 
     def instanciate_edges(self):
         self.edges = np.zeros((len(self.leaf_vertices),len(self.parent_vertices)))
-        self.leaf2id = { leaf:i for i,leaf in enumerate(self.leaf_vertices)} 
-        self.parent2id = { parent:i for i,parent in enumerate(self.parent_vertices)}
-        self.id2leaf = {i:parent for i,parent in enumerate(self.parent_vertices)}
+        for i,leaf in enumerate(self.leaf_vertices):
+            leaf.set_id(i)
+        for i,parent in enumerate(self.parent_vertices):
+            parent.set_id(i) 
         
     def add_edge(self,leaf:SuperPixel,parent:SuperPixel):
-        self.edges[self.leaf2id[leaf],self.parent2id[parent]] = 1
-        
-    def add_features_leaf(self, features, leaf):
-        self.features[self.leaf2id[leaf]] = features
+        self.edges[leaf.get_id(),parent.get_id()] = 1
         
     def convert_superpixel_to_image(self, superpixel:SuperPixel):
         m, M = get_pixel(superpixel.mask, [superpixel.mask.shape[0], superpixel.mask.shape[0]], [0, 0])
@@ -56,7 +74,7 @@ class FSG:
             i,j = p
             image[i-m[0],j-m[1],:] = self.original_image[i,j,:]
         
-        return image.astype(np.float32), m[0], m[1]
+        return image, m[0], m[1]
 
 def get_pixel(p,m,M):
     
@@ -75,14 +93,16 @@ def get_pixel(p,m,M):
 
 def create_segmentation_graph(graph):
 
-    all_leaves = graph.get_leaves()
     kaze = create_bow()
     
-    for edge in all_leaves:
-        image, x_upper_left, y_upper_left = graph.convert_superpixel_to_image(edge)
-        featuresLow = low_features(image, edge.im_shape, kaze, x_upper_left, y_upper_left)
-        edge.add_features_leaf(featuresLow)
-    
+    for i in range(graph.get_nb_leaves()):
+        leaf = graph.get_leaves(i)
+        image, x_upper_left, y_upper_left = graph.convert_superpixel_to_image(leaf)
+        features = low_features(np.uint8(image), leaf.im_shape, kaze, x_upper_left, y_upper_left)
+        leaf_id = leaf.get_id()
+        features += high_features(graph, image, kaze, leaf_id)
+        graph.change_leaf(i, SuperPixel(leaf.mask,leaf.im_shape,features))
+        
     return graph
     
 def create_Graph(original_image, transformations:dict):
@@ -98,12 +118,12 @@ def create_Graph(original_image, transformations:dict):
         if level==1:  ## coarser transformations, define the leaf level
             for i in range(nb_labels):
                 mask = np.argwhere(labels==i)
-                Graph.add_leaf(SuperPixel(mask,labels.shape))
+                Graph.add_leaf(SuperPixel(mask,labels.shape, []))
 
         else: ## other transformations, belong to parent vertices
             for i in range(nb_labels):
                 mask = np.argwhere(labels==i)
-                Graph.add_parent(SuperPixel(mask,labels.shape))
+                Graph.add_parent(SuperPixel(mask,labels.shape,[]))
 
     # Add edges
     Graph.instanciate_edges()
@@ -122,40 +142,41 @@ def create_Graph(original_image, transformations:dict):
                     break
             if np.all(isIn):
                 Graph.add_edge(leaf,parent)
-                
-            
-    return Graph
 
+    return Graph
 
 def apply_routine(in_channels):
     out_channels = []
     for i in range(len(in_channels)):
         out_channels.append(np.mean(in_channels[i]))
         out_channels.append(np.std(in_channels[i]))
-        out_channels.append(scipy.stats.skew(in_channels[i]))
-        out_channels.append(scipy.stats.kurtosis(in_channels[i]))
+        out_channels.append(scipy.stats.skew(in_channels[i],  axis=None))
+        out_channels.append(scipy.stats.kurtosis(in_channels[i],  axis=None))
     return out_channels
 
 def CIELab_components(image):
-    L,a,b = cv2.cvtColor(image,cv2.COLOR_BGR2LAB)
+    lab_image = cv2.cvtColor(image,cv2.COLOR_BGR2LAB)
+    L,a,b = cv2.split(lab_image)
     output = apply_routine([L,a,b])
     imhist,bins = np.histogram(L, 10)
-    return  imhist + output
+    return  list(imhist) + list(output)
 
 def hsv_components(image):
-    h,s,v = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+    hsv_image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+    h,s,v =  cv2.split(hsv_image)
     output = apply_routine([h,s,v])
     imhist_h,bins = np.histogram(h, 5)
     imhist_s,bins = np.histogram(s, 3)
-    return  imhist_h + imhist_s + output
+    return  list(imhist_h) + list(imhist_s) + list(output)
 
 def rgb_components(image):
-    r,g,b = cv2.cvtColor(image,cv2.COLOR_BGR2RGB)
+    p = cv2.cvtColor(image,cv2.COLOR_BGR2RGB)
+    r,g,b = p[0],p[1],p[2]
     output = apply_routine([r,g,b])
     imhist_r,bins = np.histogram(r, 10)
     imhist_g,bins = np.histogram(g, 10)
     imhist_b,bins = np.histogram(b, 10)
-    return imhist_r + imhist_g + imhist_b + output
+    return list(imhist_r) + list(imhist_g) + list(imhist_b) + list(output)
 
 def size_ratio(image, total_size):
     return [(image.shape[0] * image.shape[1]) / (total_size[0] * total_size[1])]
@@ -163,42 +184,55 @@ def size_ratio(image, total_size):
 def position(total_size,x_upper_left, y_upper_left):
     return [x_upper_left, y_upper_left, sqrt((x_upper_left - total_size[0]/2)**2+(y_upper_left - total_size[1]/2)**2)]
 
-def get_texture(image):
-    g = skimage.feature.greycomatrix(image, [1, 2], [0, np.pi/2], levels=4, normed=True, symmetric=True)
-    return skimage.feature.greycoprops(g, 'contrast')[0]
-
 def textures(image):
     gray = cv2.cvtColor(image,cv2.COLOR_BGR2GRAY)
-    gaussian = get_texture(cv2.GaussianBlur(image,(5,5),cv2.BORDER_DEFAULT))
-    mean =  get_texture(cv2.blur(image,(5,5)))
-    median = get_texture(cv2.medianBlur(image,ksize=3))
-    laplace = get_texture(cv2.Laplacian(gray, cv2.CV_16S, ksize=3))
-    sobel = get_texture(scipy.ndimage.sobel(image))
+    gaussian = cv2.GaussianBlur(image,(5,5),cv2.BORDER_DEFAULT)
+    mean =  cv2.blur(image,(5,5))
+    median = cv2.medianBlur(image,ksize=3)
+    laplace = scipy.ndimage.filters.laplace(image)
+    sobel = scipy.ndimage.sobel(image)
     laplace_gaussian = scipy.ndimage.gaussian_laplace(image, 3)
-    harris = get_texture(cv2.cornerHarris(image,4,3,2))
-    canny = get_texture(cv2.canny(image, 10,100))
-    gaussian2 = get_texture(cv2.GaussianBlur(image,(3,3),cv2.BORDER_DEFAULT))
-    mean2 =  get_texture(cv2.blur(image,(3,3)))
-    median2 = get_texture(cv2.medianBlur(image,ksize=5))
-    laplace2 = get_texture(cv2.Laplacian(gray, cv2.CV_16S, ksize=5))
+    uniform = scipy.ndimage.uniform_filter(image, size=20)
+    median3 = cv2.medianBlur(image,ksize=9)
+    gaussian2 = cv2.GaussianBlur(image,(3,3),cv2.BORDER_DEFAULT)
+    mean2 =  cv2.blur(image,(3,3))
+    median2 = cv2.medianBlur(image,ksize=5)
+    prewit = scipy.ndimage.prewitt(image)
     laplace_gaussian2 = scipy.ndimage.gaussian_laplace(image, 5)
-    harris2 = get_texture(cv2.cornerHarris(image,4,5,3))
-    canny2 = get_texture(cv2.canny(image, 100,150))
-    bilateral = get_texture(cv2.bilateralFilter(image,3,1,1))
-    return [gray, gaussian, mean, median, laplace, sobel, laplace, laplace_gaussian, harris, canny, gaussian2,mean2, median2, laplace2, laplace_gaussian2, harris2, canny2, bilateral]
+    uniform2 = scipy.ndimage.uniform_filter(image, size=10)
+    mean3 =  cv2.blur(image,(9,9))
+    bilateral = cv2.bilateralFilter(image,3,1,1)
+    all_filters = [gaussian, mean, median, laplace, sobel, laplace, laplace_gaussian, uniform, mean3, gaussian2,mean2, median2, prewit, laplace_gaussian2, uniform2, median3, bilateral]
+    result = []
+    for filt in all_filters:
+      image = np.uint8(filt)
+      gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+      result += apply_routine([gray])
+    return result
 
 def create_bow():
-    return cv2.AKAZE_create(700)
+    return cv2.AKAZE_create(descriptor_channels = 700)
 
 def bof(image, kaze):
-    gray = cv2.cvtColor(image,cv2.COLOR_BGR2GRAY)
-    return kaze.detect(gray,None)
+    im = cv2.cvtColor(image,cv2.COLOR_BGR2GRAY)
+    gray = cv2.resize(im, (14 * 4, 28*4))
+    descs =  skimage.feature.daisy(gray, radius = 2, step = 4, rings = 1, histograms=1, orientations=1)
+    return [descs[i][j][k] for i in range(len(descs)) for j in range(len(descs[0])) for k in range(len(descs[0][0]))]
 
 def low_features(image, total_size, kaze, x_upper_left, y_upper_left):
-    return bof(image, kaze) + hsv_components(image) + CIELab_components(image) + size_ratio(image, total_size) + rgb_components(image) + textures(image) + get_texture(image) + position(total_size,x_upper_left, y_upper_left)
+    return hsv_components(image) + CIELab_components(image) + size_ratio(image, total_size) + rgb_components(image) + textures(image) + position(total_size,x_upper_left, y_upper_left) + bof(image, kaze)
 
-#def high_features(super_pixels):
- #   return sum(intersection)
+def high_features(graph, image, kaze, leaf_id):
+    count_parents = 0.00001
+    feature = np.array([0. for i in range(858)])
+    edges = graph.get_edges()
+    parents = [i for i in range(graph.get_nb_parents()) if edges[leaf_id,i] == 1]
+    for parent_id in parents:
+        parent_node = graph.get_parent(parent_id)
+        count_parents += len(parent_node.mask)
+        image, x_upper_left, y_upper_left = graph.convert_superpixel_to_image(parent_node)
+        feature += len(parent_node.mask) * np.array(low_features(np.uint8(image), parent_node.im_shape, kaze, x_upper_left, y_upper_left))
+    return list(feature / count_parents)
 
 
 ### test
@@ -215,7 +249,7 @@ with open(im_path+'/'+image_name.split('.')[0]+'.pickle', 'rb') as handle:
 #transformations = {1 : transformations[1],4 : transformations[4]}
 im_path = MSRC_path+'/Images'
 
-original_image = plt.imread((im_path+'\\'+image_name.split('.')[0]+'.bmp').replace('/', "\\"))
+original_image =cv2.imread(image_name.split('.')[0]+'.bmp')
 
 G = create_Graph( original_image, transformations)
 print(np.sum(G.edges,axis=1))
