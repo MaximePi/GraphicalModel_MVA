@@ -10,6 +10,8 @@ import pickle
 import argparse
 import shutil
 
+
+
 parser = argparse.ArgumentParser()
 parser.add_argument('--level',type = int)
 parser.add_argument('--sr_inc',type = int)
@@ -77,7 +79,48 @@ for image_name in images_name:
     with open(im_path+'/'+image_name.split('.')[0]+'.pickle', 'wb') as handle:
         pickle.dump(decompositions, handle, protocol=pickle.HIGHEST_PROTOCOL)
             
-
+def transformations(MSRC_path):
+    
+    den_inc = 50
+    rr_inc = 1
+    sr_inc = 2
+    
+    if not os.path.isdir(MSRC_path+'/Decomposed_Images'):
+         os.mkdir(MSRC_path+'/Decomposed_Images')
+    images_name = os.listdir(MSRC_path+'/Images')
+    
+    images_name = ['2_29_s.bmp','15_3_s.bmp','18_21_s.bmp'] # remove to process all images
+    
+    
+    for image_name in images_name:
+        print(image_name)
+        im_path = MSRC_path+'/Decomposed_Images'+'/'+image_name.split('.')[0]
+        
+        if os.path.isdir(im_path): # delete previous transfor
+            shutil.rmtree(im_path)
+        os.mkdir(im_path)
+        
+        original_image = cv2.imread(MSRC_path+'/Images/'+image_name)
+            
+        params = {'spatial_radius' : 1,'range_radius' : 1,'min_density' : 100}
+        decompositions = { i+1 : [None,None] for i in range(decomposition_levels)}
+        
+        for i in range(decomposition_levels):
+            
+            (segmented_image, labels_image, number_regions) = pms.segment(original_image,**params)
+            decompositions[i+1][0] = labels_image
+            decompositions[i+1][1] = number_regions
+            
+            params['spatial_radius'] += sr_inc
+            params['range_radius'] += rr_inc
+            params['min_density'] += den_inc
+            
+            im = Image.fromarray(segmented_image)
+            im.save(im_path+'/'+image_name.split('.')[0]+'_level_'+str(i)+'.png')
+    
+        with open(im_path+'/'+image_name.split('.')[0]+'.pickle', 'wb') as handle:
+            pickle.dump(decompositions, handle, protocol=pickle.HIGHEST_PROTOCOL)
+            
 ## A utiliser pour lire les pickles
 #with open(im_path+'/'+image_name.split('.')[0]+'.pickle', 'rb') as handle:
 #    unserialized_data = pickle.load(handle)

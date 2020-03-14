@@ -13,77 +13,85 @@ import numpy as np
 from sklearn.datasets import load_iris
 from sklearn.model_selection import cross_val_score
 from sklearn.tree import DecisionTreeClassifier
-clf = DecisionTreeClassifier(max_depth = 2)
-iris = load_iris()
-tree.plot_tree(clf.fit( iris.data, iris.target))
-#clf.decision_path(iris.data)
+#clf = DecisionTreeClassifier(max_depth = 2)
+#iris = load_iris()
+#tree.plot_tree(clf.fit( iris.data, iris.target))
+##clf.decision_path(iris.data)
+#
+#path = clf.decision_path(iris.data).todense()
+#left = [path[np.argwhere(path[:,1] == 1 )[:,0]],np.argwhere(path[:,1] == 1 )[:,0]]
+#right = [path[np.argwhere(path[:,2] == 1 )[:,0]],np.argwhere(path[:,2] == 1 )[:,0]]
+#
+#right_1 = right[1][np.argwhere(right[0][:,3] == 1)[:,0]]
+#right_0 = right[1][np.argwhere(right[0][:,4] == 1)[:,0]]
+#Y = iris.target
+#N = iris.target.shape[0]
+#weights = np.array([1/N for i in range(N)])
+#
+#f = np.zeros((10,2))
+#k=1
+#f[k,1] = .5*np.log(np.sum(weights[right_1])/np.sum(weights[right_0]))
+#f[k,0] = .5*np.log(np.sum(weights[left[1]])/np.sum(weights[left[1]]))
+#
+#left_right = [0 if i in left[1] else 1 for i in range(N)] ## 0 : gauche , 1 : droite
+#    
+#
+#F = np.stack([f[:,col] for col in left_right],axis=1)
+#F = np.sum(F[:k,:],axis=0)
+#print(F.shape)
+#F = np.multiply(F,Y)
+#f = lambda x : 1/(1+np.exp(x))
+#f_v = np.vectorize(f)
+#weights_iteration = f_v(F)
+#weights /= sum(weights_iteration)
+#
+#weights
+#
+#path[70,:]
 
-path = clf.decision_path(iris.data).todense()
-left = [path[np.argwhere(path[:,1] == 1 )[:,0]],np.argwhere(path[:,1] == 1 )[:,0]]
-right = [path[np.argwhere(path[:,2] == 1 )[:,0]],np.argwhere(path[:,2] == 1 )[:,0]]
-
-right_1 = right[1][np.argwhere(right[0][:,3] == 1)[:,0]]
-right_0 = right[1][np.argwhere(right[0][:,4] == 1)[:,0]]
-Y = iris.target
-N = iris.target.shape[0]
-weights = np.array([1/N for i in range(N)])
-
-f = np.zeros((10,2))
-k=1
-f[k,1] = .5*np.log(np.sum(weights[right_1])/np.sum(weights[right_0]))
-f[k,0] = .5*np.log(np.sum(weights[left[1]])/np.sum(weights[left[1]]))
-
-left_right = [0 if i in left[1] else 1 for i in range(N)] ## 0 : gauche , 1 : droite
+def boosted_tree(x,y,K,s=2,eps=0.00001):
+  ## K number of weak learners
+  ## X features
+  ## y binarized labels
+    N = np.shape(y)[0]
+    weights = np.array([1/N for i in range(N)])
+    trees = {}
+    f = np.zeros((K,2))
     
+    for j in range(K):
 
-F = np.stack([f[:,col] for col in left_right],axis=1)
-F = np.sum(F[:k,:],axis=0)
-print(F.shape)
-F = np.multiply(F,Y)
-f = lambda x : 1/(1+np.exp(x))
-f_v = np.vectorize(f)
-weights_iteration = f_v(F)
-weights /= sum(weights_iteration)
-
-weights
-
-path[70,:]
-
-def boosted_tree(x,y,s,K):
-  
-  s = 2 
-  N = np.shape(y)[0]
-  weights = [1/N for i in range(N)]
-  trees = {}
-  f = np.zeros((K,2))
-
-  for j in range(K):
-
-    clf = tree.DecisionTreeClassifier(max_depth = 1)
-    clf.fit(x,y,sample_weight = weigths)
-    trees[j] = clf
-    path = clf.decision_path(x).todense()
+        clf = tree.DecisionTreeClassifier(max_depth = 2)
+        clf.fit(x,y,sample_weight = weights)
+        trees[j] = clf
+        path = clf.decision_path(x).todense()
+        if path.shape[1]==7: 
+            left = [path[np.argwhere(path[:,1] == 1 )[:,0]],np.argwhere(path[:,1] == 1 )[:,0]] 
+            right = [path[np.argwhere(path[:,4] == 1 )[:,0]],np.argwhere(path[:,4] == 1 )[:,0]]
+        
+            
+            left_1 = left[1][np.argwhere(left[0][:,3] == 1)[:,0]]
+            left_0 = left[1][np.argwhere(left[0][:,2] == 1)[:,0]]
+            
+            right_1 = right[1][np.argwhere(right[0][:,6] == 1)[:,0]]
+            right_0 = right[1][np.argwhere(right[0][:,5] == 1)[:,0]]
     
-    left = [path[np.argwhere(path[:,1] == 1 )[:,0]],np.argwhere(path[:,1] == 1 )[:,0]]
-    right = [path[np.argwhere(path[:,2] == 1 )[:,0]],np.argwhere(path[:,2] == 1 )[:,0]]
+            f[j,1] = .5*np.log((np.sum(weights[right_1])+eps)/(np.sum(weights[right_0])+eps))
+            f[j,0] = .5*np.log((np.sum(weights[left_1])+eps)/(np.sum(weights[left_0])+eps))
+            
+            left_right = [0 if i in left[1] else 1 for i in range(N)] ## 0 : gauche , 1 : droite
+            
+            F = np.stack([f[:,col] for col in left_right],axis=1)
+            F = np.sum(F[:j,:],axis=0)
+               
+            F = np.multiply(F,y)
+            logistic = lambda x : 1/(1+np.exp(x))
+            logistic_mul = np.vectorize(logistic)
+            
+            weights_iteration = logistic_mul(F)
+            weights /= sum(weights_iteration)
+        else:  # if leaf pure refine procedure
+            ## Assuming that this won't happen on large enough training ds 
+            f[j,:] = f[0,0]
 
-    left_1 = left[1][np.argwhere(left[0][:,3] == 1)[:,0]]
-    left_0 = left[1][np.argwhere(left[0][:,4] == 1)[:,0]]
+    return trees,f
     
-    right_1 = right[1][np.argwhere(right[0][:,5] == 1)[:,0]]
-    right_0 = right[1][np.argwhere(right[0][:,6] == 1)[:,0]]
-
-    f[k,1] = .5*np.log(np.sum(weights[rigth_1])/np.sum(weights[rigth_0]))
-    f[k,0] = .5*np.log(np.sum(weights[left_1])/np.sum(weights[left_0]))
-
-    left_right = [0 if i in left[1] else 1 for i in range(N)] ## 0 : gauche , 1 : droite
-    
-    F = np.stack([f[:,col] for col in left_right],axis=1)
-    F = np.sum(F[:j,:],axis=0)
-   
-    F = np.multiply(F,y)
-    logistic = lambda x : 1/(1+np.exp(x))
-    logistic_mul = np.vectorize(logistic)
-    
-    weights_iteration = logistic_mul(F)
-    weights /= sum(weights_iteration)

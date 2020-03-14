@@ -11,7 +11,7 @@ class SuperPixel:
     def __init__(self,mask,im_shape:tuple,features):
         self.mask = mask ## coordinates ofthe pixels belonging to the superpixel, shape (N_pixel,2)
         self.im_shape = im_shape # shape of size of the original image
-        self.feature = features
+        self.feature = features # list of floats 
         self.id = 0
 
     def set_id(self, id):
@@ -25,6 +25,10 @@ class SuperPixel:
     
     def get_features(self):
         return self.feature
+    
+    def add_label(self,label:int):
+        self.label = label
+    
 
 class FSG:
     def __init__(self, original_image):
@@ -91,18 +95,27 @@ def get_pixel(p,m,M):
     
     return m, M
 
-def create_segmentation_graph(graph):
-
-    kaze = create_bow()
+def create_segmentation_graph(graph,color_2_label):
     
-    for i in range(graph.get_nb_leaves()):
-        leaf = graph.get_leaves(i)
+    ## features on leaf vertices shaped (num_classes,2*num_low_features) one line per label of the parents
+    ## features on parent vertices shape (1,num_low_features)
+    
+    kaze = create_bow()
+
+    for leaf in graph.leaf_vertices: ## adding low+high level features on leaves
+
         image, x_upper_left, y_upper_left = graph.convert_superpixel_to_image(leaf)
         features = low_features(np.uint8(image), leaf.im_shape, kaze, x_upper_left, y_upper_left)
-        leaf_id = leaf.get_id()
-        features += high_features(graph, image, kaze, leaf_id)
-        graph.change_leaf(i, SuperPixel(leaf.mask,leaf.im_shape,features))
-        
+        features = np.reshape(features*len(color_2_label),(len(color_2_label),len(features)))        
+        features_high = high_features(graph, image, kaze, leaf,color_2_label)
+        features = np.concatenate((features,features_high),axis=1)
+        leaf.feature = features
+    
+    for parent in graph.parent_vertices: ## adding low level features on parents
+        image, x_upper_left, y_upper_left = graph.convert_superpixel_to_image(parent)
+        features = low_features(np.uint8(image), parent.im_shape, kaze, x_upper_left, y_upper_left)
+        parent.add_feature(features)
+    
     return graph
     
 def create_Graph(original_image, transformations:dict):
@@ -222,39 +235,145 @@ def bof(image, kaze):
 def low_features(image, total_size, kaze, x_upper_left, y_upper_left):
     return hsv_components(image) + CIELab_components(image) + size_ratio(image, total_size) + rgb_components(image) + textures(image) + position(total_size,x_upper_left, y_upper_left) + bof(image, kaze)
 
-def high_features(graph, image, kaze, leaf_id):
-    count_parents = 0.00001
-    feature = np.array([0. for i in range(858)])
-    edges = graph.get_edges()
-    parents = [i for i in range(graph.get_nb_parents()) if edges[leaf_id,i] == 1]
-    for parent_id in parents:
-        parent_node = graph.get_parent(parent_id)
-        count_parents += len(parent_node.mask)
-        image, x_upper_left, y_upper_left = graph.convert_superpixel_to_image(parent_node)
-        feature += len(parent_node.mask) * np.array(low_features(np.uint8(image), parent_node.im_shape, kaze, x_upper_left, y_upper_left))
-    return list(feature / count_parents)
+def high_features(graph, image, kaze, leaf, color_to_label):
+    
+    ## Output high_features , shape (number of classes, number of features)
+    ## One set of averaged features per class of the parent pixels
+    
+    high_features = np.zeros((len(color_to_label),858))
+    
+    for label in range(len(color_to_label)):
+        count_parents = 0.00001
+        feature = np.zeros(858)
+        edges = graph.get_edges()
+        parents = [parent for parent in graph.parent_vertices if edges[leaf.id,parent.id] == 1 and parent.label==label ]
+        
+        for parent_node in parents:
+            count_parents += len(parent_node.mask)
+            image, x_upper_left, y_upper_left = graph.convert_superpixel_to_image(parent_node)
+            feature += len(parent_node.mask) * np.array(low_features(np.uint8(image), parent_node.im_shape, kaze, x_upper_left, y_upper_left))
+        high_features[label,:] = feature/count_parents
+        
+    return high_features
 
 
-### test
-path = os.getcwd()
-MSRC_path = path + '/MSRC_ObjCategImageDatabase_v2'
-if not os.path.isdir(MSRC_path+'/Decomposed_Images'):
-     os.mkdir(MSRC_path+'/Decomposed_Images')
-images_name = os.listdir(MSRC_path+'/Images')
-image_name = "15_3_s.jpg"
-im_path = MSRC_path+'/Decomposed_Images'+'/'+image_name.split('.')[0]
-with open(im_path+'/'+image_name.split('.')[0]+'.pickle', 'rb') as handle:
-    transformations = pickle.load(handle)
+def labeling(graph:FSG,ground_truth,color_to_label:dict):
+    ## Assign a label to the superpixel, dominant label in corresponding groundtruth region
+    
+    for leaf in graph.leaf_vertices:
+        
+        labels = {label : 0 for label in range(len(color_to_label))}
+        for pos in leaf.mask:
+    
+            color = ground_truth[pos[0],pos[1],:]
+            
+            if str(color) in color_to_label.keys():
+                labels[color_to_label[str(color)]]+=1
+            else:
+                color_to_label[str(color)] = len(color_to_label)
+                labels[color_to_label[str(color)]]=1
+                
+        super_pixel_label = np.argmax(list(labels.values()))
+        leaf.add_label(super_pixel_label)
+        
+    for parent in graph.parent_vertices:  
+        labels = {label : 0 for label in range(len(color_to_label))}
+        for pos in parent.mask:
+    
+            color = ground_truth[pos[0],pos[1],:]
+            
+            if str(color) in color_to_label.keys():
+                labels[color_to_label[str(color)]]+=1
+            else:
+                color_to_label[str(color)] = len(color_to_label)
+                labels[color_to_label[str(color)]]=1
+         
+        super_pixel_label = np.argmax(list(labels.values()))
+        parent.add_label(super_pixel_label)
+        
+    return color_to_label
 
+def create_graph(db_path,color_to_label={}):
+    
+    ## db_path : Database path
+    ## color_to_label : dictionnary linking rgb triplet to label number
+    ##      by default is built as the images are processed, save 
+    
+    if not os.path.isdir(db_path+'/FSG_graphs'):
+        os.mkdir(db_path+'/FSG_graphs')
+    images_name = os.listdir(db_path+'/Images')
+
+    images_name = ['2_29_s.bmp','15_3_s.bmp','18_21_s.bmp'] # remove to process all images
+    
+
+    for image_name in images_name:
+        print(image_name)
+        transformation_path = db_path+'/Decomposed_Images'+'/'+image_name.split('.')[0]
+        graph_path = db_path+'/FSG_graphs'+'/'+image_name.split('.')[0]
+
+#        if os.path.isdir(graph_path): # delete previous transfor
+#            shutil.rmtree(graph_path)
+#        os.mkdir(graph_path)
+    
+        original_image = cv2.imread(db_path+'/Images/'+image_name)  # load image
+        ground_truth = cv2.imread(db_path+'/GroundTruth/'+image_name.split('.')[0]+'_GT.bmp')
+        
+        with open(transformation_path+'/'+image_name.split('.')[0]+'.pickle', 'rb') as handle: # load decomposed image
+            transformations = pickle.load(handle)
+        
+        G = create_Graph( original_image, transformations) # create graph
+        color_to_label = labeling(G,ground_truth,color_to_label) # add labels from ground_truth
+
+        with open(graph_path+'.pickle', 'wb') as handle: # save Graph
+            pickle.dump(G, handle, protocol=pickle.HIGHEST_PROTOCOL)  
+    with open(os.getcwd()+'/color_to_label'+'.pickle', 'wb') as handle:  # save rgb to label dic
+        pickle.dump(color_to_label, handle, protocol=pickle.HIGHEST_PROTOCOL)
+ 
+    
+#path = os.getcwd()
+#db_path = path + '/MSRC_ObjCategImageDatabase_v2'           
+#reate_graph(db_path)
+
+## DEbug
+            
+#path = os.getcwd()
+#db_path = path + '/MSRC_ObjCategImageDatabase_v2'           
+#image_name = '2_29_s.bmp'
+#
+#original_image = cv2.imread(db_path+'/Images/'+image_name)  # load image
+#ground_truth = cv2.imread(db_path+'/GroundTruth/'+image_name.split('.')[0]+'_GT.bmp')
+#transformation_path = db_path+'/Decomposed_Images'+'/'+image_name.split('.')[0]
+#
+#with open(transformation_path+'/'+image_name.split('.')[0]+'.pickle', 'rb') as handle: # load decomposed image
+#    transformations = pickle.load(handle)
+#        
+#graph = create_Graph(original_image, transformations) # create graph
+#color_to_label = {}
+#
+
+#create_graph_features(MSRC_path) 
+
+
+#def 
+#path = os.getcwd()
+#MSRC_path = path + '/MSRC_ObjCategImageDatabase_v2'
+#if not os.path.isdir(MSRC_path+'/Decomposed_Images'):
+#     os.mkdir(MSRC_path+'/Decomposed_Images')
+#images_name = os.listdir(MSRC_path+'/Images')
+#image_name = '15_3_s.bmp'
+#im_path = MSRC_path+'/Decomposed_Images'+'/'+image_name.split('.')[0]
+#with open(im_path+'/'+image_name.split('.')[0]+'.pickle', 'rb') as handle:
+#    transformations = pickle.load(handle)
+#
 #transformations = {1 : transformations[1],4 : transformations[4]}
-im_path = MSRC_path+'/Images'
-
-original_image =cv2.imread(image_name.split('.')[0]+'.bmp')
-
-G = create_Graph( original_image, transformations)
-print(np.sum(G.edges,axis=1))
-
-G_s = create_segmentation_graph(G)
+#im_path = MSRC_path+'/Images'
+#
+#original_image =cv2.imread(im_path+'/'+image_name)
+#print(original_image)
+#G = create_Graph( original_image, transformations)
+#print(np.sum(G.edges,axis=1))
+#
+#G_s = create_segmentation_graph(G)
 
 #print(len(G.parent_vertices))
 
@@ -264,3 +383,26 @@ G_s = create_segmentation_graph(G)
 #print(len(np.argwhere(np.all(B == [88,88],axis=1)==True)))
 
 #print(np.all(C,axis=1))
+
+
+#    count_parents = 0.00001
+#    feature = np.array([0. for i in range(858)])
+#    edges = graph.get_edges()
+#    parents = [i for i in range(graph.get_nb_parents()) if edges[leaf_id,i] == 1]
+#    for parent_id in parents:
+#        parent_node = graph.get_parent(parent_id)
+#        count_parents += len(parent_node.mask)
+#        image, x_upper_left, y_upper_left = graph.convert_superpixel_to_image(parent_node)
+#        feature += len(parent_node.mask) * np.array(low_features(np.uint8(image), parent_node.im_shape, kaze, x_upper_left, y_upper_left))
+#    return list(feature / count_parents)
+
+    
+    
+#    for i in range(graph.get_nb_leaves()): ## adding low+high level features on leaves
+#        leaf = graph.get_leaves(i)
+#        image, x_upper_left, y_upper_left = graph.convert_superpixel_to_image(leaf)
+#        features = low_features(np.uint8(image), leaf.im_shape, kaze, x_upper_left, y_upper_left)
+#        leaf_id = leaf.get_id()
+#        features += high_features(graph, image, kaze, leaf_id)
+#        graph.change_leaf(i, SuperPixel(leaf.mask,leaf.im_shape,features))
+    
