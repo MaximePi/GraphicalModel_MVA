@@ -29,6 +29,8 @@ def extract_features_labels(db_path):
         color_to_label = pickle.load(handle)
     
     images_name = os.listdir(db_path+'/Images')
+    images_name = [im for im in images_name if im!='Thumbs.db']
+    #images_name = images_name[250:301]
     images_name = ['2_29_s.bmp','15_3_s.bmp','18_21_s.bmp'] # remove to process all images
 
     Features_leaf, Features_parent = [],[]
@@ -81,20 +83,71 @@ def train_parents_likelihood_dist(Features_parent,labels_parent,nb_weak_learners
     
     return parents_likelihood
 
-def train_leaf_likelihood_dist(Features_leaf_per_parent_label,labels_leaf,labels_parent, nb_weak_learners=5):
+def train_leaf_likelihood_dist(Features_leaf,labels_leaf, nb_weak_learners=5):
     ## Output : leaf_likelihood dict( key : label parent_ label_leaf | value : [list of K trained trees, matrix of f left/right shape (K,2)]    
     
+#    leaf_likelihood = {}
+#    for label_parent in np.unique(labels_parent):
+#        for label_leaf in np.unique(labels_leaf):
+#            Features_leaf = Features_leaf_per_parent_label[label_parent]
+#            bin_labels = binarize_label(labels_leaf,label_leaf)
+#            trees = boosted_tree(Features_leaf,bin_labels,nb_weak_learners)
+#            key = str(label_parent)+'_'+str(label_leaf)
+#            leaf_likelihood[key] = trees
+
     leaf_likelihood = {}
-    for label_parent in np.unique(labels_parent):
-        for label_leaf in np.unique(labels_leaf):
-            Features_leaf = Features_leaf_per_parent_label[label_parent]
-            bin_labels = binarize_label(labels_leaf,label_leaf)
-            trees = boosted_tree(Features_leaf,bin_labels,nb_weak_learners)
-            key = str(label_parent)+'_'+str(label_leaf)
-            leaf_likelihood[key] = trees
+    for label in np.unique(labels_leaf):
+        bin_labels = binarize_label(labels_parent,label)
+        trees = boosted_tree(Features_leaf,bin_labels,nb_weak_learners)
+        leaf_likelihood[label] = trees
         
     return leaf_likelihood
 
+
+
+def create_matrices(db_path):
+    
+    with open(os.getcwd()+'/color_to_label'+'.pickle', 'rb') as handle: # load decomposed image
+        color_to_label = pickle.load(handle)
+    
+    images_name = os.listdir(db_path+'/Images')
+ 
+    #images_name = ['2_29_s.bmp','15_3_s.bmp','18_21_s.bmp'] # remove to process all images
+
+    Features_leaf, Features_parent = [],[]
+    labels_leaf, labels_parent = [],[]
+    
+    for image_name in images_name:
+        print(image_name)
+        graph_path = db_path+'/FSG_graphs'
+        
+        with open(graph_path+'/'+image_name.split('.')[0]+'.pickle', 'rb') as handle: # load graph with labels
+            G = pickle.load(handle)
+         
+            
+        for leaf in G.leaf_vertices:
+            Features_leaf.append(leaf.get_features())  ## features shape (num_classes,2*num_low_features)
+            labels_leaf.append(leaf.label)
+        for parent in G.parent_vertices:
+            Features_parent.append(parent.get_features())
+            labels_parent.append(parent.label)
+                
+    Features_leaf_per_parent_label = {}
+    for j in np.unique(labels_parent):
+        Features_leaf_per_parent_label[j] = np.stack([feat[j,:] for feat in Features_leaf])
+    Features_parent = np.stack(Features_parent)
+    
+    
+    with open(os.getcwd()+'/Data/Feat_leaf'+'.pickle', 'wb') as handle:  # save rgb to label dic
+        pickle.dump(Features_leaf_per_parent_label, handle, protocol=pickle.HIGHEST_PROTOCOL)
+    with open(os.getcwd()+'/Data/Feat_parents'+'.pickle', 'wb') as handle:  # save rgb to label dic
+        pickle.dump(Features_parent, handle, protocol=pickle.HIGHEST_PROTOCOL)
+    with open(os.getcwd()+'/Data/lab_leaf'+'.pickle', 'wb') as handle:  # save rgb to label dic
+        pickle.dump(labels_leaf, handle, protocol=pickle.HIGHEST_PROTOCOL)
+    with open(os.getcwd()+'/Data/lab_parents'+'.pickle', 'wb') as handle:  # save rgb to label dic
+        pickle.dump(labels_parent, handle, protocol=pickle.HIGHEST_PROTOCOL)
+    
+    return Features_leaf_per_parent_label, Features_parent, labels_leaf, labels_parent
 
 #path = os.getcwd()
 #db_path = path + '/MSRC_ObjCategImageDatabase_v2'
@@ -108,3 +161,4 @@ def train_leaf_likelihood_dist(Features_leaf_per_parent_label,labels_leaf,labels
 #        pickle.dump(parents_likelihood, handle, protocol=pickle.HIGHEST_PROTOCOL)
 #with open(os.getcwd()+'/Model/leaf_likelihood'+'.pickle', 'wb') as handle:  # save rgb to label dic
 #    pickle.dump(leaf_likelihood, handle, protocol=pickle.HIGHEST_PROTOCOL)
+

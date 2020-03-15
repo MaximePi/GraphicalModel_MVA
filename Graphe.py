@@ -95,7 +95,7 @@ def get_pixel(p,m,M):
     
     return m, M
 
-def create_segmentation_graph(graph,color_2_label):
+def create_segmentation_graph(graph,color_2_label,training=True):
     
     ## features on leaf vertices shaped (num_classes,2*num_low_features) one line per label of the parents
     ## features on parent vertices shape (1,num_low_features)
@@ -106,11 +106,12 @@ def create_segmentation_graph(graph,color_2_label):
 
         image, x_upper_left, y_upper_left = graph.convert_superpixel_to_image(leaf)
         features = low_features(np.uint8(image), leaf.im_shape, kaze, x_upper_left, y_upper_left)
-        features = np.reshape(features*len(color_2_label),(len(color_2_label),len(features)))        
+        features = np.reshape(features*int(sum(graph.edges[leaf.get_id(),:])),(int(sum(graph.edges[leaf.get_id(),:])),len(features)))
+        print(int(sum(graph.edges[leaf.get_id(),:])))
         features_high = high_features(graph, image, kaze, leaf,color_2_label)
         features = np.concatenate((features,features_high),axis=1)
         leaf.feature = features
-    
+             
     for parent in graph.parent_vertices: ## adding low level features on parents
         image, x_upper_left, y_upper_left = graph.convert_superpixel_to_image(parent)
         features = low_features(np.uint8(image), parent.im_shape, kaze, x_upper_left, y_upper_left)
@@ -184,6 +185,8 @@ def hsv_components(image):
 
 def rgb_components(image):
     p = cv2.cvtColor(image,cv2.COLOR_BGR2RGB)
+    if p.shape[0]<3:
+        p = np.concatenate(np.zeros((1,p.shape[1],p.shape[2])),axis=0)
     r,g,b = p[0],p[1],p[2]
     output = apply_routine([r,g,b])
     imhist_r,bins = np.histogram(r, 10)
@@ -240,19 +243,17 @@ def high_features(graph, image, kaze, leaf, color_to_label):
     ## Output high_features , shape (number of classes, number of features)
     ## One set of averaged features per class of the parent pixels
     
-    high_features = np.zeros((len(color_to_label),858))
-    
-    for label in range(len(color_to_label)):
-        count_parents = 0.00001
-        feature = np.zeros(858)
-        edges = graph.get_edges()
-        parents = [parent for parent in graph.parent_vertices if edges[leaf.id,parent.id] == 1 and parent.label==label ]
+    high_features = np.zeros((sum(graph.edges[leaf.get_id(),:]),858+len(color_to_label)))
+    parents = [parent for parent in graph.parent_vertices if edges[leaf.id,parent.id] == 1]
         
-        for parent_node in parents:
-            count_parents += len(parent_node.mask)
-            image, x_upper_left, y_upper_left = graph.convert_superpixel_to_image(parent_node)
-            feature += len(parent_node.mask) * np.array(low_features(np.uint8(image), parent_node.im_shape, kaze, x_upper_left, y_upper_left))
-        high_features[label,:] = feature/count_parents
+    for i,parent_node in enumerate(parents):
+        #count_parents += len(parent_node.mask)
+        image, x_upper_left, y_upper_left = graph.convert_superpixel_to_image(parent_node)
+        feature =  np.array(low_features(np.uint8(image), parent_node.im_shape, kaze, x_upper_left, y_upper_left))
+        label_dist = np.zeros(len(color_to_label))
+        label_dist[parent_node.label] = 1
+        feature = np.concatenate(feature,label_dist)
+        high_features[i,:] = feature
         
     return high_features
 
@@ -302,8 +303,9 @@ def create_graph(db_path,color_to_label={}):
     if not os.path.isdir(db_path+'/FSG_graphs'):
         os.mkdir(db_path+'/FSG_graphs')
     images_name = os.listdir(db_path+'/Images')
-
-    images_name = ['2_29_s.bmp','15_3_s.bmp','18_21_s.bmp'] # remove to process all images
+    images_name = [im for im in images_name if im!='Thumbs.db']
+    #images_name = ['20_9_s.bmp']
+    #images_name = ['2_29_s.bmp','15_3_s.bmp','18_21_s.bmp'] # remove to process all images
     
 
     for image_name in images_name:
