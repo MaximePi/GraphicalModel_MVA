@@ -136,14 +136,18 @@ def create_initial_graph(original_image, transformations:dict):
         if level==1:  ## coarser transformations, define the leaf level
             for i in range(nb_labels):
                 mask = np.argwhere(labels==i)
-                Graph.add_leaf(SuperPixel(mask,labels.shape,Features(None,None,None,None,None,None)))
+                leaf = SuperPixel(mask,labels.shape,Features(None,None,None,None,None,None))
+                leaf.set_nb_labels(nb_labels)
+                Graph.add_leaf(leaf)
                 Graph.add_leaves_neigh(neigh)
                 
                 
         else: ## other transformations, belong to parent vertices
             for i in range(nb_labels):
                 mask = np.argwhere(labels==i)
-                Graph.add_parent(SuperPixel(mask,labels.shape,Features(None,None,None,None,None,None)))
+                parent = SuperPixel(mask,labels.shape,Features(None,None,None,None,None,None))
+                parent.set_nb_labels(nb_labels)
+                Graph.add_parent(parent)
                 Graph.add_parents_neigh({(i+k):h for (i,h) in neigh.items()})
                 k += len(neigh.keys())
 
@@ -251,16 +255,16 @@ def add_features_to_parent(graph, parent, neigh):
         parent.feature.feature1low =  low_features(np.uint8(image), parent.im_shape, x_upper_left, y_upper_left)
         
     #high
-    features1high = np.array([0. for i in range(858)])
+    feature1high = np.array([0. for i in range(858)])
     for id_neigh in neigh:
         n = graph.get_parent_by_id(id_neigh)
         if n.feature.feature1low is None:
             image, x_upper_left, y_upper_left = graph.convert_superpixel_to_image(n)
             n.feature.feature1low =  low_features(np.uint8(image), n.im_shape, x_upper_left, y_upper_left)
         
-        features1high += np.array(n.feature.feature1low)
+        feature1high += np.array(n.feature.feature1low)
     
-    parent.feature.feature1high = list(features1high/len(neigh))
+    parent.feature.feature1high = list(feature1high/len(neigh))
 
 
 def create_segmentation_graph(graph,training):
@@ -290,8 +294,8 @@ def add_features_to_leaf(graph, leaf, neigh):
     #high
     feature2low = np.array([0. for i in range(858)])
     for id_neigh in neigh:
-        n = graph.get_leaf_by_id[id_neigh]
-        if n.feature.features2low is None:
+        n = graph.get_leaf_by_id(id_neigh)
+        if n.feature.feature2low is None:
             image, x_upper_left, y_upper_left = graph.convert_superpixel_to_image(n)
             n.feature.feature1low =  low_features(np.uint8(image), n.im_shape, x_upper_left, y_upper_left)
         
@@ -301,8 +305,8 @@ def add_features_to_leaf(graph, leaf, neigh):
     
     feature2high = np.array([0. for i in range(858)])
     for id_neigh in neigh:
-        n = graph.get_parent_by_id[id_neigh]
-        if n.feature.features1high is None:
+        n = graph.get_parent_by_id(id_neigh)
+        if n.feature.feature1high is None:
             image, x_upper_left, y_upper_left = graph.convert_superpixel_to_image(n)
             n.feature.feature1high = low_features(np.uint8(image), n.im_shape, x_upper_left, y_upper_left)
         
@@ -312,7 +316,7 @@ def add_features_to_leaf(graph, leaf, neigh):
     
     class2 = np.array([0. for i in range(leaf.get_nb_labels())])
     for id_neigh in neigh:
-        n = graph.get_parent_by_id[id_neigh]
+        n = graph.get_parent_by_id(id_neigh)
         if n.feature.class2 is None:
             n.feature.class2  = [0 for i in range(n.get_nb_labels())]
             n.feature.class2[n.get_label()] = 1
@@ -334,7 +338,9 @@ def add_features_to_leaf(graph, leaf, neigh):
         else:
             new_leaf = SuperPixel(leaf.mask, leaf.im_shape, Features(list(feature1low),list(feature1high),list(class1),list(feature2low),list(feature2high),list(class2)))
             new_leaf.set_id(graph.get_nb_leaves() + 1)
+            new_leaf.set_nb_labels(leaf.get_nb_labels())
             graph.add_leaf(new_leaf)
+            graph.edges = numpy.concatenate((graph.edges,graph.edges[new_leaf.get_id(),:].copy()), axis=1)
             graph.add_edge(new_leaf,parent_node)
             graph.add_edge(leaf,parent_node)
 
