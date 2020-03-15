@@ -5,7 +5,10 @@ import os
 import scipy.stats
 import scipy.ndimage
 import skimage.feature
-from math import sqrt
+from scipy import signal
+from skimage.color import rgb2yiq
+import matplotlib.pyplot as plt
+from math import exp, sqrt, pi
 
 class Features:
     def __init__(self,feature1low,feature1high,class1,feature2low,feature2high,class2):
@@ -126,6 +129,7 @@ def create_initial_graph(original_image, transformations:dict):
 
     # Add vertices
     Graph = FSG(original_image)
+    k = 0
     for level,transf in transformations.items():
         labels,nb_labels, neigh = transf[0], transf[1], transf[2]
         
@@ -135,11 +139,13 @@ def create_initial_graph(original_image, transformations:dict):
                 Graph.add_leaf(SuperPixel(mask,labels.shape,Features(None,None,None,None,None,None)))
                 Graph.add_leaves_neigh(neigh)
                 
+                
         else: ## other transformations, belong to parent vertices
             for i in range(nb_labels):
                 mask = np.argwhere(labels==i)
                 Graph.add_parent(SuperPixel(mask,labels.shape,Features(None,None,None,None,None,None)))
-                Graph.add_parents_neigh(neigh)
+                Graph.add_parents_neigh({(i+k):h for (i,h) in neigh.items()})
+                k += len(neigh.keys())
 
     # Add edges
     Graph.instanciate_edges()
@@ -264,11 +270,11 @@ def create_segmentation_graph(graph,training):
 
     ## adding low level features on parents
     for parent in graph.parent_vertices:
-       add_features_to_parent(graph, parent, graph.leaves_neighbours[parent.get_id()-1])
+        add_features_to_parent(graph, parent, graph.parents_neighbours[parent.get_id()])
              
     ## adding low+high level features on leaves
     for leaf in graph.leaf_vertices: 
-        add_features_to_leaf(graph, leaf, graph.parents_neighbours[leaf.get_id()-1])
+        add_features_to_leaf(graph, leaf, graph.leaves_neighbours[leaf.get_id()])
 
 def add_features_to_leaf(graph, leaf, neigh):
     #low
@@ -406,6 +412,83 @@ def create_graph(db_path,color_to_label={}):
     with open(os.getcwd()+'/color_to_label'+'.pickle', 'wb') as handle:  # save rgb to label dic
         pickle.dump(color_to_label, handle, protocol=pickle.HIGHEST_PROTOCOL)
  
+ 
+def create_graph_for_graph_cut(rgb, k=1., sigma=0.8, sz=1):
+    # create the pixel graph with edge weights as dissimilarities
+     
+     for i in range(3):
+         rgb[:,:,i] = signal.convolve2d(rgb[:,:,i], gauss_kernel, boundary='symm', mode='same')
+     
+     yuv = rgb2yiq(rgb)
+
+     edges = []
+     vertices = []
+
+     for i in range(yuv.shape[0]):
+         for j in range(yuv.shape[1]):
+             #compute edge weight for nbd pixel nodes for the node i,j
+             for i1 in range(i-1, i+2):
+                 for j1 in range(j-1, j+2):
+
+                     if i1 == i and j1 == j:
+                        continue
+                     
+                     if 0 <= i1 and i1 < yuv.shape[0] and 0 <= j1 and j1 < yuv.shape[1]:
+                        wt = np.abs(yuv[i,j,0]-yuv[i1,j1,0])
+                        vertices.append((i,j))
+                        vertices.append((i1,j1))
+                        edges.append((wt,(i1,j1),(i,j)))
+     
+     return edges, list(set(vertices))
+
+def MInt(W1, W2, k):
+      if len(W1) != 0:
+          I_1 = max(W1)
+          tau1 = k / len(W1)
+          s1 = I_1 + tau1
+      else:
+          s1 = 1e10
+      
+      if len(W2) != 0:
+          I_2 = max(W2)
+          tau2 = k / len(W2)
+          s2 = I_2 + tau2
+      else:
+          s2 = 1e10
+
+      return max(s1, s2)
+
+def refine_graph_for_graph_cut(edges, vertices, k):
+    #step 0
+    edges.sort()
+    #step 1
+    Sq = {i:[vertices[i]] for i in range(len(vertices))}
+    Wq = {i:[] for i in range(len(vertices))}
+    V2Cq = {vertices[i]:i for i in range(len(vertices))}
+    #step 2
+    for q in range(len(edges)):
+        #step 3
+        w, v_i, v_j = edges[q]
+        c_i, c_j = V2Cq[v_i], V2Cq[v_j]
+
+        if c_i != c_j and w < MInt(Wq[c_i], Wq[c_j], k):
+            for v in Sq[max(c_i, c_j)]:
+              V2Cq[v] = min(c_i, c_j)
+            Sq[min(c_i, c_j)] = Sq[c_i] + Sq[c_j]
+            Wq[min(c_i, c_j)] = Wq[c_i] + Wq[c_j] + [w]
+            del Sq[max(c_i, c_j)]
+            del Wq[max(c_i, c_j)]
+
+    #step 4
+    return Sq
+
+# k = 0.005
+# image =  cv2.imread("test2.jfif")
+# image = cv2.GaussianBlur(image, (5,5),1)
+# edges, vertices = create_graph_for_graph_cut(image, k=1., sigma=0.8, sz=1)
+# colors = refine_graph_for_graph_cut(edges, vertices, k)
+# color_graph(colors, image.shape[:2])
+    
 # path = os.getcwd()
 # db_path = path + '\\MSRC_ObjCategImageDatabase_v2'           
 # create_graph(db_path)  
@@ -427,4 +510,4 @@ graph = create_initial_graph(original_image, transformations) # create graph
 color_to_label = {}
 color_to_label = labeling(graph,ground_truth,color_to_label)
 print(color_to_label)
-create_segmentation_graph(graph,color_to_label,True)
+create_segmentation_graph(graph,True)
