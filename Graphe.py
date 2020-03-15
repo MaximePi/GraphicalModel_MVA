@@ -340,7 +340,7 @@ def add_features_to_leaf(graph, leaf, neigh):
             new_leaf.set_id(graph.get_nb_leaves() + 1)
             new_leaf.set_nb_labels(leaf.get_nb_labels())
             graph.add_leaf(new_leaf)
-            graph.edges = numpy.concatenate((graph.edges,graph.edges[new_leaf.get_id(),:].copy()), axis=1)
+            graph.edges = np.vstack([graph.edges, graph.edges[leaf.get_id(),:].copy()])
             graph.add_edge(new_leaf,parent_node)
             graph.add_edge(leaf,parent_node)
 
