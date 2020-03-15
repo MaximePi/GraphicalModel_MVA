@@ -72,6 +72,12 @@ def extract_features_labels(db_path):
     
     return Features_leaf_per_parent_label, Features_parent, labels_leaf, labels_parent
 
+def infer_labels(graph,leaf_likelihood,parent_likelihood):
+    ## Input
+    ## FSG graph with features of the image to predict
+    for leaf in graph.leaf_vertices:
+        a=1
+
 def train_parents_likelihood_dist(Features_parent,labels_parent,nb_weak_learners=5):    
     ## Output : parent_likelihood dict( key : label | value : [list of K trained trees, matrix of f left/right shape (K,2)]  
     
@@ -84,7 +90,7 @@ def train_parents_likelihood_dist(Features_parent,labels_parent,nb_weak_learners
     return parents_likelihood
 
 def train_leaf_likelihood_dist(Features_leaf,labels_leaf, nb_weak_learners=5):
-    ## Output : leaf_likelihood dict( key : label parent_ label_leaf | value : [list of K trained trees, matrix of f left/right shape (K,2)]    
+    ## Output : leaf_likelihood dict( key : label | value : [list of K trained trees, matrix of f left/right shape (K,2)] 
     
 #    leaf_likelihood = {}
 #    for label_parent in np.unique(labels_parent):
@@ -103,7 +109,49 @@ def train_leaf_likelihood_dist(Features_leaf,labels_leaf, nb_weak_learners=5):
         
     return leaf_likelihood
 
+def predict_parent(parent_feature,color_to_label,parents_likelihood):
+    # Input :
+    # parent_feature : 1-D array of low level features for the parent
+    # color_to_label : dictionnary mapping color to class label
+    # parent_likelihood : fitted boosted trees and ratio
+    # Output:
+    # C dimensional vector of probabilities over the classes
+    
+    prob = np.zeros(len(color_to_label))
+    for label in len(color_to_label):
+        trees,weights = parents_likelihood[label]
+        p_label = 0
+        for num_learner,tree in enumerate(trees):
+            if parent_feature[tree.tree_.feature[0]]<=tree.tree_.treshold:
+                p_label+=weights[num_learner,0]
+            else:
+                p_label+=weights[num_learner,1]
+        prob[label] = np.exp(p_label)
+    prob /= sum(prob)
 
+    return prob
+
+def predict_leaf(leaf_feature,color_to_label,leaf_likelihood):
+    # Input :
+    # leaf_feature : 1-D array of low+high level+class features
+    # color_to_label : dictionnary mapping color to class label
+    # leaf_likelihood : fitted boosted trees and ratio
+    # Output:
+    # C dimensional vector of probabilities over the classes
+    
+    prob = np.zeros(len(color_to_label))
+    for label in len(color_to_label):
+        trees,weights = leaf_likelihood[label]
+        p_label = 0
+        for num_learner,tree in enumerate(trees):
+            if leaf_feature[tree.tree_.feature[0]]<=tree.tree_.treshold:
+                p_label+=weights[num_learner,0]
+            else:
+                p_label+=weights[num_learner,1]
+        prob[label] = np.exp(p_label)
+    prob /= sum(prob)
+
+    return prob
 
 def create_matrices(db_path):
     
