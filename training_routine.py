@@ -59,9 +59,9 @@ def create_train_test_split(db_path):
     
 def create_matrices(db_path,training_name,N_labels):
 
-    images_name = os.listdir(db_path+'/Images')
-    images_name = [image_name for image_name in images_name if image_name in training_name]
-    #images_name = ['1_23_s.bmp','3_25_s.bmp','4_6_s.bmp'] # remove to process all images
+    #images_name = os.listdir(db_path+'/Images')
+    #images_name = [image_name for image_name in images_name if image_name in training_name]
+    images_name = ['19_9_s.bmp','18_1_s.bmp','18_20_s.bmp'] # remove to process all images
 
     Features_leaf, Features_parent = [],[]
     labels_leaf, labels_parent = [],[]
@@ -74,10 +74,13 @@ def create_matrices(db_path,training_name,N_labels):
             G = pickle.load(handle)
              
         for leaf in G.leaf_vertices:
-            Features_leaf.append(leaf.get_features(N_labels))  ## features shape (num_classes,2*num_low_features)
-            labels_leaf.append(leaf.label)
+            ll = leaf.get_features(N_labels)
+            if len(ll)<3480: ## leaf w. no parents
+                Features_leaf.append(ll)  ## features shape (num_classes,2*num_low_features)
+                labels_leaf.append(leaf.label)
+            
         for parent in G.parent_vertices:
-            par_feat = parent.get_features()
+            par_feat = parent.get_features(N_labels)
             if par_feat not in Features_parent: # bc duplicates among parents | one leaf, one parent
                 Features_parent.append(par_feat)
                 labels_parent.append(parent.label)
@@ -86,10 +89,12 @@ def create_matrices(db_path,training_name,N_labels):
     #padded_features = []
     #for feat in Features_leaf:
     #    padded_features.append(np.concatenate((feat,[0]*(max_len-len(feat)))))
-        
+
+
     Features_leaf = np.stack(Features_leaf)
     Features_parent = np.stack(Features_parent)
-    
+    print(Features_leaf.shape)
+    print(Features_parent.shape)
     with open(os.getcwd()+'/Data/Training_Features_leaf'+'.pickle', 'wb') as handle:  # save rgb to label dic
         pickle.dump(Features_leaf, handle, protocol=pickle.HIGHEST_PROTOCOL)
     with open(os.getcwd()+'/Data/Training_Features_parents'+'.pickle', 'wb') as handle:  # save rgb to label dic
@@ -134,18 +139,16 @@ db_path = path + '/MSRC_ObjCategImageDatabase_v2'
 #create_train_test_split(db_path) # Deja fait
 with open(os.getcwd()+'/Data/train_names'+'.pickle', 'rb') as handle:  # save rgb to label dic
     training_names = pickle.load(handle)
-
 with open(os.getcwd()+'/color_to_label'+'.pickle', 'rb') as handle:  # save rgb to label dic
     color_to_label = pickle.load(handle)
 
 N_labels = len(color_to_label)
-
-Features_leaf, Features_parent, labels_leaf, labels_parent = create_matrices(db_path,N_labels,training_names)
+Features_leaf, Features_parent, labels_leaf, labels_parent = create_matrices(db_path,training_names,N_labels)
 
 parents_likelihood = train_parents_likelihood_dist(Features_parent,labels_parent,nb_weak_learners=5)
-with open(os.getcwd()+'/Model/parents_likelihood'+'.pickle', 'wb') as handle:  # save rgb to label dic
+with open(os.getcwd()+'/Model/parents_likelihood_debug'+'.pickle', 'wb') as handle:  # save rgb to label dic
     pickle.dump(parents_likelihood, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
 leaf_likelihood = train_leaf_likelihood_dist(Features_leaf,labels_leaf,nb_weak_learners=5)
-with open(os.getcwd()+'/Model/leaf_likelihood'+'.pickle', 'wb') as handle:  # save rgb to label dic
+with open(os.getcwd()+'/Model/leaf_likelihood_debug'+'.pickle', 'wb') as handle:  # save rgb to label dic
     pickle.dump(leaf_likelihood, handle, protocol=pickle.HIGHEST_PROTOCOL)

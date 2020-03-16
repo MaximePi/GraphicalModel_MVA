@@ -28,10 +28,13 @@ class SuperPixel:
     
     def get_features(self, max_nb_class):
         result = self.feature.feature1low + self.feature.feature1high
-        if self.class1 is None:
+        if self.feature.class1 is None:
             return result
         else:
-            return result + self.class1 + [0 for i in range(max_nb_class - len(self.class1))] + self.feature2low + self.feature2high + self.class2 +  [0 for i in range(max_nb_class - len(self.class2))] 
+            self.feature.class1 = list(np.zeros((max_nb_class)))
+            self.feature.class1[self.label] = 1
+            self.feature.class2 = self.feature.class2[:max_nb_class] 
+            return result + self.feature.class1 + self.feature.feature2low + self.feature.feature2high + self.feature.class2 
 
     def set_id(self, id):
         self.id = id
