@@ -25,6 +25,9 @@ class SuperPixel:
         self.im_shape = im_shape # shape of size of the original image
         self.feature = features # list of floats 
         self.id = 0
+    
+    def get_features(self):
+        return self.feature1low + self.feature1high + self.class1 + self.feature2low + self.feature2high + self.class2
 
     def set_id(self, id):
         self.id = id
@@ -277,7 +280,7 @@ def create_segmentation_graph(graph,training):
         add_features_to_parent(graph, parent, graph.parents_neighbours[parent.get_id()])
              
     ## adding low+high level features on leaves
-    for leaf in graph.leaf_vertices: 
+    for leaf in graph.leaf_vertices:
         add_features_to_leaf(graph, leaf, graph.leaves_neighbours[leaf.get_id()])
 
 def add_features_to_leaf(graph, leaf, neigh):
@@ -338,11 +341,13 @@ def add_features_to_leaf(graph, leaf, neigh):
         else:
             new_leaf = SuperPixel(leaf.mask, leaf.im_shape, Features(list(feature1low),list(feature1high),list(class1),list(feature2low),list(feature2high),list(class2)))
             new_leaf.set_id(graph.get_nb_leaves() + 1)
+            new_leaf.add_label(leaf.get_label())
             new_leaf.set_nb_labels(leaf.get_nb_labels())
-            graph.add_leaf(new_leaf)
-            graph.edges = np.vstack([graph.edges, graph.edges[leaf.get_id(),:].copy()])
-            graph.add_edge(new_leaf,parent_node)
-            graph.add_edge(leaf,parent_node)
+            #graph.add_leaf(new_leaf)
+            #graph.leaves_neighbours[new_leaf.get_id()] = []
+            #graph.edges = np.vstack([graph.edges, graph.edges[leaf.get_id(),:].copy()])
+            #graph.add_edge(new_leaf,parent_node)
+            graph.delete_edge(leaf,parent_node)
 
 def labeling(graph:FSG,ground_truth,color_to_label:dict):
     ## Assign a label to the superpixel, dominant label in corresponding groundtruth region
