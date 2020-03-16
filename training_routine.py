@@ -68,7 +68,7 @@ def create_matrices(db_path,training_name,N_labels):
     
     for image_name in images_name:
         print(image_name)
-        graph_path = db_path+'/FSG_graphs'
+        graph_path = db_path+'/FSG_graphs_final'
         
         with open(graph_path+'/'+image_name.split('.')[0]+'.pickle', 'rb') as handle: # load graph with labels
             G = pickle.load(handle)
@@ -87,7 +87,7 @@ def create_matrices(db_path,training_name,N_labels):
     #for feat in Features_leaf:
     #    padded_features.append(np.concatenate((feat,[0]*(max_len-len(feat)))))
         
-    Features_leaf = np.stack(padded_features)
+    Features_leaf = np.stack(Features_leaf)
     Features_parent = np.stack(Features_parent)
     
     with open(os.getcwd()+'/Data/Training_Features_leaf'+'.pickle', 'wb') as handle:  # save rgb to label dic

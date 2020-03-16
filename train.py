@@ -22,18 +22,18 @@ def extract_features(db_path):
     
     images_name = os.listdir(db_path+'/Images')
     images_name = [im for im in images_name if im!='Thumbs.db']
-    #images_name = images_name[250:301]
+    images_name = images_name[250:300]
     #images_name = ['2_29_s.bmp','15_3_s.bmp','18_21_s.bmp'] # remove to process all images
 
-    Features_leaf, Features_parent = [],[]
-    labels_leaf, labels_parent = [],[]
-    
+
     for image_name in images_name:
         print(image_name)
-        graph_path = db_path+'/FSG_graphs'
-        with open(graph_path+'/'+image_name.split('.')[0]+'.pickle', 'rb') as handle: # load graph with labels
+        graph_path = db_path+'\\FSG_graphs'
+        graph_path2 = db_path+'\\FSG_graphs_final'
+
+        with open(graph_path+'\\'+image_name.split('.')[0]+'.pickle', 'rb') as handle: # load graph with labels
             G = pickle.load(handle)
-        create_segmentation_graph(G,graph_path+'/'+image_name.split('.')[0]+'.pickle') # compute features on superpixels
+        create_segmentation_graph(G,graph_path2+'\\'+image_name.split('.')[0]+'.pickle') # compute features on superpixels
         
         
 def infer_labels(graph, color_to_label, leaf_likelihood,parents_likelihood):

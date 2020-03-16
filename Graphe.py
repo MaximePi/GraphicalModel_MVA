@@ -446,21 +446,3 @@ def render_prediction(graph, color_to_label):
     
     return image
 
-# DEbug
-            
-path = os.getcwd()
-db_path =""           
-image_name = '20_6_s.bmp'
-
-original_image = cv2.imread(image_name)  # load image
-ground_truth = cv2.imread(image_name.split('.')[0]+'_GT.bmp')
-transformation_path = image_name.split('.')[0]
-
-with open(image_name.split('.')[0]+'.pickle', 'rb') as handle: # load decomposed image
-    transformations = pickle.load(handle)
-        
-graph = create_initial_graph(original_image, transformations) # create graph
-color_to_label = {}
-color_to_label = labeling(graph,ground_truth,color_to_label)
-print(color_to_label)
-create_segmentation_graph(graph,True)
