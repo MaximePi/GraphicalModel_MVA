@@ -75,7 +75,7 @@ def test(db_path,testing_name,N_labels, color_to_label,leaf_likelihood,parents_l
         
         with open(graph_path+'/'+image_name.split('.')[0]+'.pickle', 'rb') as handle: # load graph with labels
             G = pickle.load(handle)
-        
+        print()
         newG = train.infer_labels(G, color_to_label, leaf_likelihood,parents_likelihood)
         image = render_prediction(newG, color_to_label)
         

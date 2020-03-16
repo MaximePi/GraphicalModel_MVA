@@ -41,15 +41,20 @@ def infer_labels(graph, color_to_label, leaf_likelihood,parents_likelihood):
     ## FSG graph with features of the image to predict
     p_Y_X = {}
     mask2leaf_id = {}
-    
-    #compute probabilities
     for leaf in graph.leaf_vertices:
         
         if str(leaf.mask) not in mask2leaf_id.keys():
             mask2leaf_id[str(leaf.mask)] = leaf.get_id()
+        else:
+            if len([parent for parent in graph.parent_vertices if graph.get_edges()[leaf_id,parent.id] == 1]) == 0:
+                 mask2leaf_id[str(leaf.mask)] = leaf.get_id()
+    
+    
+    #compute probabilities
+    for leaf in graph.leaf_vertices:
         
         leaf_id = mask2leaf_id[str(leaf.mask)]
-        all_potential_parents = [parent for parent in graph.parent_vertices if graph.get_edges()[leaf.id,parent.id] == 1]
+        all_potential_parents = [parent for parent in graph.parent_vertices if graph.get_edges()[leaf_id,parent.id] == 1]
         parent = all_potential_parents[0]
         
         for Y in parents_likelihood.keys():
