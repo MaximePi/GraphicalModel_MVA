@@ -62,7 +62,7 @@ def create_matrices(db_path,training_name,N_labels):
 
     #images_name = os.listdir(db_path+'/Images')
     #images_name = [image_name for image_name in images_name if image_name in training_name]
-    images_name = ['2_28_s.bmp','4_8_s.bmp', '6_15_s.bmp'] # remove to process all images
+    #images_name = ['2_28_s.bmp','4_8_s.bmp', '6_15_s.bmp'] # remove to process all images
     #images_name = os.listdir(db_path+'/Images')
     #images_name = [image_name for image_name in images_name if image_name in training_name and image_name!='12_8_s.bmp']
     #images_name = ['19_9_s.bmp','18_1_s.bmp','18_20_s.bmp'] # remove to process all images
@@ -71,7 +71,7 @@ def create_matrices(db_path,training_name,N_labels):
     Features_leaf, Features_parent = [],[]
     labels_leaf, labels_parent = [],[]
     
-    for image_name in images_name:
+    for image_name in training_name:
         print(image_name)
         graph_path = db_path+'/FSG_graphs_final'
         
@@ -140,6 +140,23 @@ def train_leaf_likelihood_dist(Features_leaf,labels_leaf, nb_weak_learners=5):
 path = os.getcwd()
 db_path = path + '/MSRC_ObjCategImageDatabase_v2'  
 
+train_name = []
+test_name = []
+for classe in range(1,20):
+    nums = [3,5,10]
+    for num in nums:
+        if num==10:
+            name = str(classe)+'_'+str(num)+'_'+'s.bmp'
+            test_name.append(name)
+        else:
+            name = str(classe)+'_'+str(num)+'_'+'s.bmp'
+            train_name.append(name)
+
+with open(os.getcwd()+'/Data/train_names'+'.pickle', 'wb') as handle:  # save rgb to label dic
+        pickle.dump(train_name, handle, protocol=pickle.HIGHEST_PROTOCOL)
+with open(os.getcwd()+'/Data/test_names'+'.pickle', 'wb') as handle:  # save rgb to label dic
+        pickle.dump(test_name, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
 #create_train_test_split(db_path) # Deja fait
 with open(os.getcwd()+'/Data/train_names'+'.pickle', 'rb') as handle:  # save rgb to label dic
     training_names = pickle.load(handle)
@@ -147,13 +164,14 @@ with open(os.getcwd()+'/color_to_label'+'.pickle', 'rb') as handle:  # save rgb 
     color_to_label = pickle.load(handle)
 
 N_labels = len(color_to_label)
+
 Features_leaf, Features_parent, labels_leaf, labels_parent = create_matrices(db_path,training_names,N_labels)
 print('parent likelihood')
 parents_likelihood = train_parents_likelihood_dist(Features_parent,labels_parent,nb_weak_learners=5)
-with open(os.getcwd()+'/Model/parents_likelihood_debug'+'.pickle', 'wb') as handle:  # save rgb to label dic
+with open(os.getcwd()+'/Model/parents_likelihood'+'.pickle', 'wb') as handle:  # save rgb to label dic
     pickle.dump(parents_likelihood, handle, protocol=pickle.HIGHEST_PROTOCOL)
     
 print('leaf likelihood')
 leaf_likelihood = train_leaf_likelihood_dist(Features_leaf,labels_leaf,nb_weak_learners=5)
-with open(os.getcwd()+'/Model/leaf_likelihood_debug'+'.pickle', 'wb') as handle:  # save rgb to label dic
+with open(os.getcwd()+'/Model/leaf_likelihood'+'.pickle', 'wb') as handle:  # save rgb to label dic
     pickle.dump(leaf_likelihood, handle, protocol=pickle.HIGHEST_PROTOCOL)
