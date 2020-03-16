@@ -74,7 +74,7 @@ def create_matrices(db_path,training_name,N_labels):
             G = pickle.load(handle)
              
         for leaf in G.leaf_vertices:
-            Features_leaf.append(leaf.get_features())  ## features shape (num_classes,2*num_low_features)
+            Features_leaf.append(leaf.get_features(N_labels))  ## features shape (num_classes,2*num_low_features)
             labels_leaf.append(leaf.label)
         for parent in G.parent_vertices:
             par_feat = parent.get_features()
@@ -82,10 +82,10 @@ def create_matrices(db_path,training_name,N_labels):
                 Features_parent.append(par_feat)
                 labels_parent.append(parent.label)
                 
-    max_len = max([len(feat) for feat in Features_leaf])
-    padded_features = []
-    for feat in Features_leaf:
-        padded_features.append(np.concatenate((feat,[0]*(max_len-len(feat)))))
+    #max_len = max([len(feat) for feat in Features_leaf])
+    #padded_features = []
+    #for feat in Features_leaf:
+    #    padded_features.append(np.concatenate((feat,[0]*(max_len-len(feat)))))
         
     Features_leaf = np.stack(padded_features)
     Features_parent = np.stack(Features_parent)
