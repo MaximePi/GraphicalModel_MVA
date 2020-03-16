@@ -56,11 +56,11 @@ def mIoU(context_matrix,ground_truth,labels):
 path = os.getcwd()
 db_path = path + '/MSRC_ObjCategImageDatabase_v2'  
 
-with open(os.getcwd()+'/Model/parents_likelihood_debug.pickle', 'rb') as handle:  # save rgb to label dic
+with open(os.getcwd()+'/Model/parents_likelihood.pickle', 'rb') as handle:  # save rgb to label dic
     parents_likelihood =  pickle.load(handle)
-with open(os.getcwd()+'/Model/leaf_likelihood_debug.pickle', 'rb') as handle:  # save rgb to label dic
+with open(os.getcwd()+'/Model/leaf_likelihood.pickle', 'rb') as handle:  # save rgb to label dic
     leaf_likelihood =  pickle.load(handle)
-with open(os.getcwd()+'/Data/train_names'+'.pickle', 'rb') as handle:  # save rgb to label dic
+with open(os.getcwd()+'/Data/test_names'+'.pickle', 'rb') as handle:  # save rgb to label dic
     testing_names = pickle.load(handle)
 with open(os.getcwd()+'/color_to_label'+'.pickle', 'rb') as handle:  # save rgb to label dic
     color_to_label = pickle.load(handle)
@@ -72,9 +72,9 @@ def test(db_path,testing_name,N_labels, color_to_label,leaf_likelihood,parents_l
     metrics_tot = []
     #images_name = os.listdir(db_path+'/Images')
     #images_name = [image_name for image_name in images_name if image_name in testing_name]
-    images_name = ['2_28_s.bmp'] # remove to process all images
+    #images_name = ['2_28_s.bmp'] # remove to process all images
     
-    for image_name in images_name:
+    for image_name in testing_name:
         print(image_name)
         graph_path = db_path+'/FSG_graphs_final'
         
@@ -104,5 +104,5 @@ def test(db_path,testing_name,N_labels, color_to_label,leaf_likelihood,parents_l
     
     return metrics_tot
     
-test(db_path,testing_names,N_labels, color_to_label,leaf_likelihood,parents_likelihood)
+met = test(db_path,testing_names,N_labels, color_to_label,leaf_likelihood,parents_likelihood)
     
