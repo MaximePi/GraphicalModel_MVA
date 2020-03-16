@@ -53,6 +53,12 @@ class SuperPixel:
     
     def add_label(self,label:int):
         self.label = label
+    
+    def set_label(self,label:int):
+        self.label_pred = label
+    
+    def set_label_pred(self):
+        return self.label_pred
         
     def get_label(self):
         return self.label
