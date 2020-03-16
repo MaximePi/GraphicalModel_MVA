@@ -59,9 +59,9 @@ def create_train_test_split(db_path):
     
 def create_matrices(db_path,training_name,N_labels):
 
-    #images_name = os.listdir(db_path+'/Images')
-    #images_name = [image_name for image_name in images_name if image_name in training_name]
-    images_name = ['19_9_s.bmp','18_1_s.bmp','18_20_s.bmp'] # remove to process all images
+    images_name = os.listdir(db_path+'/Images')
+    images_name = [image_name for image_name in images_name if image_name in training_name and image_name!='12_8_s.bmp']
+    #images_name = ['19_9_s.bmp','18_1_s.bmp','18_20_s.bmp'] # remove to process all images
 
     Features_leaf, Features_parent = [],[]
     labels_leaf, labels_parent = [],[]
@@ -75,7 +75,7 @@ def create_matrices(db_path,training_name,N_labels):
              
         for leaf in G.leaf_vertices:
             ll = leaf.get_features(N_labels)
-            if len(ll)<3480: ## leaf w. no parents
+            if len(ll)>3000: ## exclude leaf w. no parents
                 Features_leaf.append(ll)  ## features shape (num_classes,2*num_low_features)
                 labels_leaf.append(leaf.label)
             
@@ -144,11 +144,12 @@ with open(os.getcwd()+'/color_to_label'+'.pickle', 'rb') as handle:  # save rgb 
 
 N_labels = len(color_to_label)
 Features_leaf, Features_parent, labels_leaf, labels_parent = create_matrices(db_path,training_names,N_labels)
-
+print('parent likelihood')
 parents_likelihood = train_parents_likelihood_dist(Features_parent,labels_parent,nb_weak_learners=5)
 with open(os.getcwd()+'/Model/parents_likelihood_debug'+'.pickle', 'wb') as handle:  # save rgb to label dic
     pickle.dump(parents_likelihood, handle, protocol=pickle.HIGHEST_PROTOCOL)
-
+    
+print('leaf likelihood')
 leaf_likelihood = train_leaf_likelihood_dist(Features_leaf,labels_leaf,nb_weak_learners=5)
 with open(os.getcwd()+'/Model/leaf_likelihood_debug'+'.pickle', 'wb') as handle:  # save rgb to label dic
     pickle.dump(leaf_likelihood, handle, protocol=pickle.HIGHEST_PROTOCOL)
