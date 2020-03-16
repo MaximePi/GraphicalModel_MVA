@@ -274,7 +274,7 @@ def add_features_to_parent(graph, parent, neigh):
     parent.feature.feature1high = list(feature1high/len(neigh))
 
 
-def create_segmentation_graph(graph,training):
+def create_segmentation_graph(graph,graph_path):
     
     ## features on leaf vertices shaped (num_classes,2*num_low_features) one line per label of the parents
     ## features on parent vertices shape (1,num_low_features)
@@ -286,6 +286,9 @@ def create_segmentation_graph(graph,training):
     ## adding low+high level features on leaves
     for leaf in graph.leaf_vertices:
         add_features_to_leaf(graph, leaf, graph.leaves_neighbours[leaf.get_id()])
+
+    with open(graph_path, 'wb') as handle: # save Graph
+        pickle.dump(graph, handle, protocol=pickle.HIGHEST_PROTOCOL)  
 
 def add_features_to_leaf(graph, leaf, neigh):
     #low
@@ -353,6 +356,7 @@ def add_features_to_leaf(graph, leaf, neigh):
             #graph.add_edge(new_leaf,parent_node)
             graph.delete_edge(leaf,parent_node)
 
+
 def labeling(graph:FSG,ground_truth,color_to_label:dict):
     ## Assign a label to the superpixel, dominant label in corresponding groundtruth region
     
@@ -400,23 +404,23 @@ def create_graph(db_path,color_to_label={}):
         os.mkdir(db_path+'/FSG_graphs')
     images_name = os.listdir(db_path+'/Images')
     images_name = [im for im in images_name if im!='Thumbs.db']
-    images_name = ['20_6_s.bmp']
+    images_name = ['8_21_s.bmp']
     #images_name = ['2_29_s.bmp','15_3_s.bmp','18_21_s.bmp'] # remove to process all images
     
 
     for image_name in images_name:
         print(image_name)
-        transformation_path = db_path+'\\Decomposed_Images'+'\\'+image_name.split('.')[0]
-        graph_path = db_path+'\\FSG_graphs'+'\\'+image_name.split('.')[0]
+        transformation_path = db_path+'/Decomposed_Images'+'/'+image_name.split('.')[0]
+        graph_path = db_path+'/FSG_graphs'+'/'+image_name.split('.')[0]
 
 #        if os.path.isdir(graph_path): # delete previous transfor
 #            shutil.rmtree(graph_path)
 #        os.mkdir(graph_path)
     
-        original_image = cv2.imread(db_path+'\\Images\\'+image_name)  # load image
-        ground_truth = cv2.imread(db_path+'\\GroundTruth\\'+image_name.split('.')[0]+'_GT.bmp')
+        original_image = cv2.imread(db_path+'/Images/'+image_name)  # load image
+        ground_truth = cv2.imread(db_path+'/GroundTruth/'+image_name.split('.')[0]+'_GT.bmp')
         
-        with open(transformation_path+'\\'+image_name.split('.')[0]+'.pickle', 'rb') as handle: # load decomposed image
+        with open(transformation_path+'/'+image_name.split('.')[0]+'.pickle', 'rb') as handle: # load decomposed image
             transformations = pickle.load(handle)
         
         G = create_initial_graph( original_image, transformations) # create graph
@@ -426,6 +430,7 @@ def create_graph(db_path,color_to_label={}):
             pickle.dump(G, handle, protocol=pickle.HIGHEST_PROTOCOL)  
     with open(os.getcwd()+'/color_to_label'+'.pickle', 'wb') as handle:  # save rgb to label dic
         pickle.dump(color_to_label, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
 
 # DEbug
             
@@ -445,3 +450,72 @@ color_to_label = {}
 color_to_label = labeling(graph,ground_truth,color_to_label)
 print(color_to_label)
 create_segmentation_graph(graph,True)
+
+ 
+ 
+def create_graph_for_graph_cut(rgb, k=1., sigma=0.8, sz=1):
+    # create the pixel graph with edge weights as dissimilarities
+     
+     yuv = rgb2yiq(rgb)
+
+     edges = []
+     vertices = []
+
+     for i in range(yuv.shape[0]):
+         for j in range(yuv.shape[1]):
+             #compute edge weight for nbd pixel nodes for the node i,j
+             for i1 in range(i-1, i+2):
+                 for j1 in range(j-1, j+2):
+
+                     if i1 == i and j1 == j:
+                        continue
+                     
+                     if 0 <= i1 and i1 < yuv.shape[0] and 0 <= j1 and j1 < yuv.shape[1]:
+                        wt = np.abs(yuv[i,j,0]-yuv[i1,j1,0])
+                        vertices.append((i,j))
+                        vertices.append((i1,j1))
+                        edges.append((wt,(i1,j1),(i,j)))
+     
+     return edges, list(set(vertices))
+
+def MInt(W1, W2, k):
+      if len(W1) != 0:
+          I_1 = max(W1)
+          tau1 = k / len(W1)
+          s1 = I_1 + tau1
+      else:
+          s1 = 1e10
+      
+      if len(W2) != 0:
+          I_2 = max(W2)
+          tau2 = k / len(W2)
+          s2 = I_2 + tau2
+      else:
+          s2 = 1e10
+
+      return max(s1, s2)
+
+def refine_graph_for_graph_cut(edges, vertices, k):
+    #step 0
+    edges.sort()
+    #step 1
+    Sq = {i:[vertices[i]] for i in range(len(vertices))}
+    Wq = {i:[] for i in range(len(vertices))}
+    V2Cq = {vertices[i]:i for i in range(len(vertices))}
+    #step 2
+    for q in range(len(edges)):
+        #step 3
+        w, v_i, v_j = edges[q]
+        c_i, c_j = V2Cq[v_i], V2Cq[v_j]
+
+        if c_i != c_j and w < MInt(Wq[c_i], Wq[c_j], k):
+            for v in Sq[max(c_i, c_j)]:
+              V2Cq[v] = min(c_i, c_j)
+            Sq[min(c_i, c_j)] = Sq[c_i] + Sq[c_j]
+            Wq[min(c_i, c_j)] = Wq[c_i] + Wq[c_j] + [w]
+            del Sq[max(c_i, c_j)]
+            del Wq[max(c_i, c_j)]
+
+    #step 4
+    return Sq
+
