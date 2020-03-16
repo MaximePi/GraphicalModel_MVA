@@ -23,7 +23,7 @@ def render_prediction(graph, color_to_label):
 
 def N_m_n(context_matrix,ground_truth,m,n):
 
-  index = len(np.intersection2d(np.argwhere( context_matrix == n ) , np.argwhere( ground_truth == m )))
+  index = len(np.intersect1d(np.argwhere( context_matrix == n ) , np.argwhere( ground_truth == m )))
   return index
 
 def GPA(context_matrix,ground_truth,labels):
@@ -105,3 +105,4 @@ def test(db_path,testing_name,N_labels, color_to_label,leaf_likelihood,parents_l
     return metrics_tot
     
 test(db_path,testing_names,N_labels, color_to_label,leaf_likelihood,parents_likelihood)
+    
