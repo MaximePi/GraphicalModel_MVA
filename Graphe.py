@@ -27,7 +27,11 @@ class SuperPixel:
         self.id = 0
     
     def get_features(self):
-        return self.feature1low + self.feature1high + self.class1 + self.feature2low + self.feature2high + self.class2
+        result = self.feature.feature1low + self.feature.feature1high
+        if self.class1 is None:
+            return result
+        else:
+            return result + self.class1 + self.feature2low + self.feature2high + self.class2
 
     def set_id(self, id):
         self.id = id
@@ -426,9 +430,6 @@ def create_graph(db_path,color_to_label={}):
  
 def create_graph_for_graph_cut(rgb, k=1., sigma=0.8, sz=1):
     # create the pixel graph with edge weights as dissimilarities
-     
-     for i in range(3):
-         rgb[:,:,i] = signal.convolve2d(rgb[:,:,i], gauss_kernel, boundary='symm', mode='same')
      
      yuv = rgb2yiq(rgb)
 
