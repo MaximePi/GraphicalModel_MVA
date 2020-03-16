@@ -401,7 +401,9 @@ def labeling(graph:FSG,ground_truth,color_to_label:dict):
         
     return color_to_label
 
-def create_graph(db_path,color_to_label={}, image_names):
+
+
+def create_graph(db_path,images_name,color_to_label={}):
     
     ## db_path : Database path
     ## color_to_label : dictionnary linking rgb triplet to label number
@@ -413,7 +415,6 @@ def create_graph(db_path,color_to_label={}, image_names):
     #images_name = [im for im in images_name if im!='Thumbs.db']
     #images_name = ['8_21_s.bmp']
     #images_name = ['2_28_s.bmp','4_8_s.bmp', '6_15_s.bmp'] # remove to process all images
-    
 
     for image_name in images_name:
         print(db_path+'/Decomposed_Images'+'/'+image_name.split('.')[0])
