@@ -53,15 +53,16 @@ def infer_labels(graph, color_to_label, leaf_likelihood,parents_likelihood):
         parent = all_potential_parents[0]
         
         for Y in parents_likelihood.keys():
+            proba_tot = 0
             for label in parents_likelihood.keys():
                 
                 new_class1 = np.array([0 for i in parents_likelihood.keys()])
-                new_class1[Y] = 1
+                new_class1[label] = 1
                 leaf.feature.class1 = new_class1
-                proba_leaf_label = predict_leaf(Y, leaf.get_features(),color_to_label,leaf_likelihood)
+                proba_leaf_label = predict_leaf(label, leaf.get_features(),color_to_label,leaf_likelihood)
                 proba_parent_label = predict_parent(label, parent.get_features(),color_to_label,parents_likelihood)
                 
-            proba_tot = proba_parent_label*proba_leaf_label
+                proba_tot += proba_parent_label*proba_leaf_label
             if leaf_id in p_Y_X.keys():
                 if proba_tot in p_Y_X[leaf_id]:
                     p_Y_X[leaf_id][Y] += proba_tot
@@ -74,7 +75,7 @@ def infer_labels(graph, color_to_label, leaf_likelihood,parents_likelihood):
     for leaf in graph.leaf_vertices:
         leaf_id = mask2leaf_id[str(leaf.mask)]
         label = max(p_Y_X[leaf_id], key=p_Y_X[leaf_id].get)
-        leaf.set_label(label)
+        leaf.add_label(label)
     
     return graph
     

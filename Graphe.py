@@ -26,12 +26,12 @@ class SuperPixel:
         self.feature = features # list of floats 
         self.id = 0
     
-    def get_features(self):
+    def get_features(self, max_nb_class):
         result = self.feature.feature1low + self.feature.feature1high
         if self.class1 is None:
             return result
         else:
-            return result + self.class1 + self.feature2low + self.feature2high + self.class2
+            return result + self.class1 + [0 for i in range(max_nb_class - len(self.class1))] + self.feature2low + self.feature2high + self.class2 +  [0 for i in range(max_nb_class - len(self.class2))] 
 
     def set_id(self, id):
         self.id = id
@@ -41,9 +41,6 @@ class SuperPixel:
 
     def add_feature(self, features):
         self.feature = features
-    
-    def get_features(self):
-        return self.feature
     
     def set_nb_labels(self, nb_labels):
         self.nb_labels = nb_labels
