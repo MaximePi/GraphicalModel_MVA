@@ -426,7 +426,6 @@ def create_graph(db_path,color_to_label={}):
             pickle.dump(G, handle, protocol=pickle.HIGHEST_PROTOCOL)  
     with open(os.getcwd()+'/color_to_label'+'.pickle', 'wb') as handle:  # save rgb to label dic
         pickle.dump(color_to_label, handle, protocol=pickle.HIGHEST_PROTOCOL)
-                        edges.append((wt,(i1,j1),(i,j)))
 
 # DEbug
             
