@@ -46,6 +46,7 @@ def infer_labels(graph, color_to_label, leaf_likelihood,parents_likelihood):
         if str(leaf.mask) not in mask2leaf_id.keys():
             mask2leaf_id[str(leaf.mask)] = leaf.get_id()
         else:
+            leaf_id = mask2leaf_id[str(leaf.mask)]
             if len([parent for parent in graph.parent_vertices if graph.get_edges()[leaf_id,parent.id] == 1]) == 0:
                  mask2leaf_id[str(leaf.mask)] = leaf.get_id()
     
