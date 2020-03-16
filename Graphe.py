@@ -296,6 +296,7 @@ def create_segmentation_graph(graph,graph_path):
     with open(graph_path, 'wb') as handle: # save Graph
         pickle.dump(graph, handle, protocol=pickle.HIGHEST_PROTOCOL)  
 
+
 def add_features_to_leaf(graph, leaf, neigh):
     #low
     if leaf.feature.feature1low is None:
@@ -360,7 +361,7 @@ def add_features_to_leaf(graph, leaf, neigh):
             #graph.leaves_neighbours[new_leaf.get_id()] = []
             #graph.edges = np.vstack([graph.edges, graph.edges[leaf.get_id(),:].copy()])
             #graph.add_edge(new_leaf,parent_node)
-            graph.delete_edge(leaf,parent_node)
+            #graph.delete_edge(leaf,parent_node)
 
 
 def labeling(graph:FSG,ground_truth,color_to_label:dict):
@@ -408,14 +409,14 @@ def create_graph(db_path,color_to_label={}):
     
     if not os.path.isdir(db_path+'/FSG_graphs'):
         os.mkdir(db_path+'/FSG_graphs')
-    images_name = os.listdir(db_path+'/Images')
-    images_name = [im for im in images_name if im!='Thumbs.db']
-    images_name = ['8_21_s.bmp']
-    #images_name = ['2_29_s.bmp','15_3_s.bmp','18_21_s.bmp'] # remove to process all images
+    #images_name = os.listdir(db_path+'/Images')
+    #images_name = [im for im in images_name if im!='Thumbs.db']
+    #images_name = ['8_21_s.bmp']
+    images_name = ['2_28_s.bmp','4_8_s.bmp', '6_15_s.bmp'] # remove to process all images
     
 
     for image_name in images_name:
-        print(image_name)
+        print(db_path+'/Decomposed_Images'+'/'+image_name.split('.')[0])
         transformation_path = db_path+'/Decomposed_Images'+'/'+image_name.split('.')[0]
         graph_path = db_path+'/FSG_graphs'+'/'+image_name.split('.')[0]
 

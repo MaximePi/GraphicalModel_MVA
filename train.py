@@ -20,10 +20,10 @@ def extract_features(db_path):
     with open(os.getcwd()+'/color_to_label'+'.pickle', 'rb') as handle: # load decomposed image
         color_to_label = pickle.load(handle)
     
-    images_name = os.listdir(db_path+'/Images')
-    images_name = [im for im in images_name if im!='Thumbs.db']
-    images_name = images_name[250:300]
-    #images_name = ['2_29_s.bmp','15_3_s.bmp','18_21_s.bmp'] # remove to process all images
+    #images_name = os.listdir(db_path+'/Images')
+    #images_name = [im for im in images_name if im!='Thumbs.db']
+    #images_name = images_name[250:300]
+    images_name = ['2_28_s.bmp','4_8_s.bmp', '6_15_s.bmp'] # remove to process all images
 
 
     for image_name in images_name:
@@ -34,7 +34,7 @@ def extract_features(db_path):
         with open(graph_path+'\\'+image_name.split('.')[0]+'.pickle', 'rb') as handle: # load graph with labels
             G = pickle.load(handle)
         create_segmentation_graph(G,graph_path2+'\\'+image_name.split('.')[0]+'.pickle') # compute features on superpixels
-        
+
         
 def infer_labels(graph, color_to_label, leaf_likelihood,parents_likelihood):
     ## Input
@@ -50,25 +50,30 @@ def infer_labels(graph, color_to_label, leaf_likelihood,parents_likelihood):
             if len([parent for parent in graph.parent_vertices if graph.get_edges()[leaf_id,parent.id] == 1]) == 0:
                  mask2leaf_id[str(leaf.mask)] = leaf.get_id()
     
-    
+    N_labels = len(color_to_label)
     #compute probabilities
     for leaf in graph.leaf_vertices:
         
         leaf_id = mask2leaf_id[str(leaf.mask)]
         all_potential_parents = [parent for parent in graph.parent_vertices if graph.get_edges()[leaf_id,parent.id] == 1]
+        
+        if len(all_potential_parents) == 0:
+            continue
         parent = all_potential_parents[0]
         
-        for Y in parents_likelihood.keys():
+        for Y in range(N_labels):
             proba_tot = 0
-            for label in parents_likelihood.keys():
+            for label in range(N_labels):
                 
-                new_class1 = np.array([0 for i in parents_likelihood.keys()])
+                new_class1 = np.array([0 for i in range(N_labels)])
                 new_class1[label] = 1
-                leaf.feature.class1 = new_class1
-                proba_leaf_label = predict_leaf(label, leaf.get_features(),color_to_label,leaf_likelihood)
-                proba_parent_label = predict_parent(label, parent.get_features(),color_to_label,parents_likelihood)
                 
+                leaf.feature.class1 = new_class1
+                
+                proba_leaf_label = predict_leaf(label, leaf.get_features(N_labels),color_to_label,leaf_likelihood)
+                proba_parent_label = predict_parent(label, parent.get_features(N_labels),color_to_label,parents_likelihood)
                 proba_tot += proba_parent_label*proba_leaf_label
+    
             if leaf_id in p_Y_X.keys():
                 if proba_tot in p_Y_X[leaf_id]:
                     p_Y_X[leaf_id][Y] += proba_tot
@@ -79,7 +84,13 @@ def infer_labels(graph, color_to_label, leaf_likelihood,parents_likelihood):
     
     #assemble
     for leaf in graph.leaf_vertices:
+        
         leaf_id = mask2leaf_id[str(leaf.mask)]
+        all_potential_parents = [parent for parent in graph.parent_vertices if graph.get_edges()[leaf_id,parent.id] == 1]
+        
+        if len(all_potential_parents) == 0:
+            continue
+        
         label = max(p_Y_X[leaf_id], key=p_Y_X[leaf_id].get)
         leaf.add_label(label)
     
@@ -128,8 +139,9 @@ def predict_parent(label, parent_feature,color_to_label,parents_likelihood):
     
         trees,weights = parents_likelihood[label]
         p_label = 0
-        for num_learner,tree in enumerate(trees):
-            if parent_feature[tree.tree_.feature[0]]<=tree.tree_.treshold:
+        for num_learner in range(len(trees)):
+            tree = trees[num_learner]
+            if parent_feature[tree.tree_.feature[0]]<=tree.tree_.threshold[0]:
                 p_label+=weights[num_learner,0]
             else:
                 p_label+=weights[num_learner,1]
@@ -145,8 +157,9 @@ def predict_leaf(label, leaf_feature,color_to_label,leaf_likelihood):
     
     trees,weights = leaf_likelihood[label]
     p_label = 0
-    for num_learner,tree in enumerate(trees):
-        if leaf_feature[tree.tree_.feature[0]]<=tree.tree_.treshold:
+    for num_learner in range(len(trees)):
+        tree = trees[num_learner]
+        if leaf_feature[tree.tree_.feature[0]]<=tree.tree_.threshold[0]:
             p_label+=weights[num_learner,0]
         else:
             p_label+=weights[num_learner,1]
@@ -172,10 +185,10 @@ def create_matrices(db_path,training_name):
             G = pickle.load(handle)
              
         for leaf in G.leaf_vertices:
-            Features_leaf.append(leaf.get_features())  ## features shape (num_classes,2*num_low_features)
+            Features_leaf.append(leaf.get_features(N_labels))  ## features shape (num_classes,2*num_low_features)
             labels_leaf.append(leaf.label)
         for parent in G.parent_vertices:
-            Features_parent.append(parent.get_features())
+            Features_parent.append(parent.get_features(N_labels))
             labels_parent.append(parent.label)
                 
     Features_leaf = np.stack(Features_leaf)

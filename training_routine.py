@@ -61,7 +61,7 @@ def create_matrices(db_path,training_name,N_labels):
 
     #images_name = os.listdir(db_path+'/Images')
     #images_name = [image_name for image_name in images_name if image_name in training_name]
-    images_name = ['19_9_s.bmp','18_1_s.bmp','18_20_s.bmp'] # remove to process all images
+    images_name = ['2_28_s.bmp','4_8_s.bmp', '6_15_s.bmp'] # remove to process all images
 
     Features_leaf, Features_parent = [],[]
     labels_leaf, labels_parent = [],[]
@@ -75,7 +75,7 @@ def create_matrices(db_path,training_name,N_labels):
              
         for leaf in G.leaf_vertices:
             ll = leaf.get_features(N_labels)
-            if len(ll)<3480: ## leaf w. no parents
+            if len(ll) > 3440: ## leaf w. no parents
                 Features_leaf.append(ll)  ## features shape (num_classes,2*num_low_features)
                 labels_leaf.append(leaf.label)
             
@@ -89,7 +89,6 @@ def create_matrices(db_path,training_name,N_labels):
     #padded_features = []
     #for feat in Features_leaf:
     #    padded_features.append(np.concatenate((feat,[0]*(max_len-len(feat)))))
-
 
     Features_leaf = np.stack(Features_leaf)
     Features_parent = np.stack(Features_parent)

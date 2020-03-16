@@ -7,12 +7,17 @@ import train
 def render_prediction(graph, color_to_label):
     
     label_to_color = {l:c for (c,l) in color_to_label.items()}
-    image = np.zeros(graph.leaf_vertices[0].im_shape)
+    shape = graph.leaf_vertices[0].im_shape
+    image = np.zeros((shape[0],shape[1],3))
     
     for leaf in graph.leaf_vertices:
         for p in leaf.mask:
             i,j = p
-            image[i,j] = label_to_color(leaf.get_label())
+            color = label_to_color[leaf.get_label()].split('[')[-1]
+            color = color.split(']')[0]
+            color = color.split(" ")
+            color = [c for c in color if len(c) > 0]
+            image[i,j,:] = [int(color[0]), int(color[1]), int(color[2])]
     
     return image
 
@@ -65,17 +70,17 @@ N_labels = len(color_to_label)
 def test(db_path,testing_name,N_labels, color_to_label,leaf_likelihood,parents_likelihood):
 
     metrics_tot = []
-    images_name = os.listdir(db_path+'/Images')
-    images_name = [image_name for image_name in images_name if image_name in testing_name]
-    #images_name = ['1_23_s.bmp','3_25_s.bmp','4_6_s.bmp'] # remove to process all images
+    #images_name = os.listdir(db_path+'/Images')
+    #images_name = [image_name for image_name in images_name if image_name in testing_name]
+    images_name = ['2_28_s.bmp'] # remove to process all images
     
     for image_name in images_name:
         print(image_name)
-        graph_path = db_path+'/FSG_graphs'
+        graph_path = db_path+'/FSG_graphs_final'
         
         with open(graph_path+'/'+image_name.split('.')[0]+'.pickle', 'rb') as handle: # load graph with labels
             G = pickle.load(handle)
-        print()
+
         newG = train.infer_labels(G, color_to_label, leaf_likelihood,parents_likelihood)
         image = render_prediction(newG, color_to_label)
         
