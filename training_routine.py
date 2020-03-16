@@ -59,9 +59,15 @@ def create_train_test_split(db_path):
     
 def create_matrices(db_path,training_name,N_labels):
 
+<<<<<<< HEAD
+    #images_name = os.listdir(db_path+'/Images')
+    #images_name = [image_name for image_name in images_name if image_name in training_name]
+    images_name = ['2_28_s.bmp','4_8_s.bmp', '6_15_s.bmp'] # remove to process all images
+=======
     images_name = os.listdir(db_path+'/Images')
     images_name = [image_name for image_name in images_name if image_name in training_name and image_name!='12_8_s.bmp']
     #images_name = ['19_9_s.bmp','18_1_s.bmp','18_20_s.bmp'] # remove to process all images
+>>>>>>> d0171ea370a6e24f1af42768775837265e9f63b4
 
     Features_leaf, Features_parent = [],[]
     labels_leaf, labels_parent = [],[]
@@ -75,7 +81,11 @@ def create_matrices(db_path,training_name,N_labels):
              
         for leaf in G.leaf_vertices:
             ll = leaf.get_features(N_labels)
+<<<<<<< HEAD
+            if len(ll) > 3440: ## leaf w. no parents
+=======
             if len(ll)>3000: ## exclude leaf w. no parents
+>>>>>>> d0171ea370a6e24f1af42768775837265e9f63b4
                 Features_leaf.append(ll)  ## features shape (num_classes,2*num_low_features)
                 labels_leaf.append(leaf.label)
             
@@ -89,7 +99,6 @@ def create_matrices(db_path,training_name,N_labels):
     #padded_features = []
     #for feat in Features_leaf:
     #    padded_features.append(np.concatenate((feat,[0]*(max_len-len(feat)))))
-
 
     Features_leaf = np.stack(Features_leaf)
     Features_parent = np.stack(Features_parent)
