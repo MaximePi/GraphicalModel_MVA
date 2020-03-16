@@ -434,18 +434,6 @@ def create_graph(db_path,color_to_label={}):
     with open(os.getcwd()+'/color_to_label'+'.pickle', 'wb') as handle:  # save rgb to label dic
         pickle.dump(color_to_label, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
-def render_prediction(graph, color_to_label):
-    
-    label_to_color = {l:c for (c,l) in color_to_label.items()}
-    image = np.zeros(graph.leaf_vertices[0].im_shape)
-    
-    for leaf in graph.leaf_vertices:
-        for p in leaf.mask:
-            i,j = p
-            image[i,j] = label_to_color(leaf.get_label())
-    
-    return image
-
 # DEbug
             
 path = os.getcwd()
