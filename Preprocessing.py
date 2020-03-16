@@ -6,7 +6,7 @@ import os
 path = os.getcwd()
 db_path = path + '\\MSRC_ObjCategImageDatabase_v2'  
 
-image_names = images_name = os.listdir(db_path+'/Images')[100:]
+image_names = images_name = os.listdir(db_path+'/Images')[:100]
 
 print('Segmentation')
 #transformations(db_path)      
