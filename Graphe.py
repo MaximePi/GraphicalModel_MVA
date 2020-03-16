@@ -401,7 +401,7 @@ def labeling(graph:FSG,ground_truth,color_to_label:dict):
         
     return color_to_label
 
-def create_graph(db_path,color_to_label={}):
+def create_graph(db_path,color_to_label={}, image_names):
     
     ## db_path : Database path
     ## color_to_label : dictionnary linking rgb triplet to label number
@@ -409,7 +409,7 @@ def create_graph(db_path,color_to_label={}):
     
     if not os.path.isdir(db_path+'/FSG_graphs'):
         os.mkdir(db_path+'/FSG_graphs')
-    images_name = os.listdir(db_path+'/Images')[100:]
+    #images_name = os.listdir(db_path+'/Images')[100:]
     #images_name = [im for im in images_name if im!='Thumbs.db']
     #images_name = ['8_21_s.bmp']
     #images_name = ['2_28_s.bmp','4_8_s.bmp', '6_15_s.bmp'] # remove to process all images
