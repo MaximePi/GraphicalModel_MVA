@@ -14,16 +14,7 @@ def binarize_label(labels,m):
 
     return bin_labels
 
-def extract_features_labels(db_path):
-    ## Compute features from raw graphs for each images
-    ## Save graphs with features 
-    ## Save classification dataset and labels 
-    
-    ### Output
-    ## label leaf , label for all the leaf of all the FSG
-    ## label parent , label for all the leaf of all the FSG
-    ## Features_leaf_per_parent_label, dict | key = label of parent | value = low feat of leaf+ avg high feat of parents with key label -> shape (num total leaf,2*num_low_features)
-    ## Features_parent, shape (num total parent,num_low_features )
+def extract_features(db_path):
     
     with open(os.getcwd()+'/color_to_label'+'.pickle', 'rb') as handle: # load decomposed image
         color_to_label = pickle.load(handle)
@@ -31,7 +22,7 @@ def extract_features_labels(db_path):
     images_name = os.listdir(db_path+'/Images')
     images_name = [im for im in images_name if im!='Thumbs.db']
     #images_name = images_name[250:301]
-    images_name = ['2_29_s.bmp','15_3_s.bmp','18_21_s.bmp'] # remove to process all images
+    #images_name = ['2_29_s.bmp','15_3_s.bmp','18_21_s.bmp'] # remove to process all images
 
     Features_leaf, Features_parent = [],[]
     labels_leaf, labels_parent = [],[]
@@ -39,38 +30,14 @@ def extract_features_labels(db_path):
     for image_name in images_name:
         print(image_name)
         graph_path = db_path+'/FSG_graphs'
-        
         with open(graph_path+'/'+image_name.split('.')[0]+'.pickle', 'rb') as handle: # load graph with labels
             G = pickle.load(handle)
-        G = create_segmentation_graph(G,color_to_label) # compute features on superpixels
+        create_segmentation_graph(G,graph_path+'/'+image_name.split('.')[0]+'.pickle') # compute features on superpixels
         
-        with open(graph_path+'/'+image_name.split('.')[0]+'.pickle', 'wb') as handle: # save Graph
-            pickle.dump(G, handle, protocol=pickle.HIGHEST_PROTOCOL)  
+        
             
-        for leaf in G.leaf_vertices:
-            Features_leaf.append(leaf.get_features())  ## features shape (num_classes,2*num_low_features)
-            labels_leaf.append(leaf.label)
-        for parent in G.parent_vertices:
-            Features_parent.append(parent.get_features())
-            labels_parent.append(parent.label)
-                
+    
 
-    Features_leaf_per_parent_label = {}
-    for j in np.unique(labels_parent):
-        Features_leaf_per_parent_label[j] = np.stack([feat[j,:] for feat in Features_leaf])
-    Features_parent = np.stack(Features_parent)
-    
-    
-    with open(os.getcwd()+'/Data/Feat_leaf'+'.pickle', 'wb') as handle:  # save rgb to label dic
-        pickle.dump(Features_leaf_per_parent_label, handle, protocol=pickle.HIGHEST_PROTOCOL)
-    with open(os.getcwd()+'/Data/Feat_parents'+'.pickle', 'wb') as handle:  # save rgb to label dic
-        pickle.dump(Features_parent, handle, protocol=pickle.HIGHEST_PROTOCOL)
-    with open(os.getcwd()+'/Data/lab_leaf'+'.pickle', 'wb') as handle:  # save rgb to label dic
-        pickle.dump(labels_leaf, handle, protocol=pickle.HIGHEST_PROTOCOL)
-    with open(os.getcwd()+'/Data/lab_parents'+'.pickle', 'wb') as handle:  # save rgb to label dic
-        pickle.dump(labels_parent, handle, protocol=pickle.HIGHEST_PROTOCOL)
-    
-    return Features_leaf_per_parent_label, Features_parent, labels_leaf, labels_parent
 
 def infer_labels(graph,leaf_likelihood,parent_likelihood):
     ## Input
@@ -153,13 +120,13 @@ def predict_leaf(leaf_feature,color_to_label,leaf_likelihood):
 
     return prob
 
-def create_matrices(db_path):
+def create_matrices(db_path,training_name):
     
     with open(os.getcwd()+'/color_to_label'+'.pickle', 'rb') as handle: # load decomposed image
         color_to_label = pickle.load(handle)
     
     images_name = os.listdir(db_path+'/Images')
- 
+    images_name = [image_name for image_name in images_name if image_name in training_name]
     #images_name = ['2_29_s.bmp','15_3_s.bmp','18_21_s.bmp'] # remove to process all images
 
     Features_leaf, Features_parent = [],[]
@@ -171,8 +138,7 @@ def create_matrices(db_path):
         
         with open(graph_path+'/'+image_name.split('.')[0]+'.pickle', 'rb') as handle: # load graph with labels
             G = pickle.load(handle)
-         
-            
+             
         for leaf in G.leaf_vertices:
             Features_leaf.append(leaf.get_features())  ## features shape (num_classes,2*num_low_features)
             labels_leaf.append(leaf.label)
@@ -180,23 +146,52 @@ def create_matrices(db_path):
             Features_parent.append(parent.get_features())
             labels_parent.append(parent.label)
                 
-    Features_leaf_per_parent_label = {}
-    for j in np.unique(labels_parent):
-        Features_leaf_per_parent_label[j] = np.stack([feat[j,:] for feat in Features_leaf])
+    Features_leaf = np.stack(Features_leaf)
     Features_parent = np.stack(Features_parent)
     
     
-    with open(os.getcwd()+'/Data/Feat_leaf'+'.pickle', 'wb') as handle:  # save rgb to label dic
+    with open(os.getcwd()+'/Data/Training_Features_leaf'+'.pickle', 'wb') as handle:  # save rgb to label dic
         pickle.dump(Features_leaf_per_parent_label, handle, protocol=pickle.HIGHEST_PROTOCOL)
-    with open(os.getcwd()+'/Data/Feat_parents'+'.pickle', 'wb') as handle:  # save rgb to label dic
+    with open(os.getcwd()+'/Data/Training_Features_parents'+'.pickle', 'wb') as handle:  # save rgb to label dic
         pickle.dump(Features_parent, handle, protocol=pickle.HIGHEST_PROTOCOL)
-    with open(os.getcwd()+'/Data/lab_leaf'+'.pickle', 'wb') as handle:  # save rgb to label dic
+    with open(os.getcwd()+'/Data/Training_labels_leaf'+'.pickle', 'wb') as handle:  # save rgb to label dic
         pickle.dump(labels_leaf, handle, protocol=pickle.HIGHEST_PROTOCOL)
-    with open(os.getcwd()+'/Data/lab_parents'+'.pickle', 'wb') as handle:  # save rgb to label dic
+    with open(os.getcwd()+'/Data/Training_labels_parents'+'.pickle', 'wb') as handle:  # save rgb to label dic
         pickle.dump(labels_parent, handle, protocol=pickle.HIGHEST_PROTOCOL)
     
     return Features_leaf_per_parent_label, Features_parent, labels_leaf, labels_parent
 
+def create_train_test_split(db_path):
+
+    images_name = os.listdir(db_path+'/Images')
+    images_name = [im for im in images_name if im!='Thumbs.db']
+    train_name,test_name = [],[]
+    
+    for classe in range(1,20):
+        train_labels = np.random.randint(1,31,25)
+        #test_labels = [ i for i in range(1,31) if not in train_labels]
+        for train_label in train_labels:
+            name = str(classe)+'_'+str(train_label)+'_'+'s.bmp'
+            train_name.append(name)
+        for test_label in test_labels:
+            name = str(classe)+'_'+str(test_label)+'_'+'s.bmp'
+            test_name.append(name)
+            
+    classe = 20
+    train_labels = np.random.randint(1,22,25)
+    #test_labels = [ i for i in range(1,22) if not in train_labels]
+    for train_label in train_labels:
+        name = str(classe)+'_'+str(train_label)+'_'+'s.bmp'
+        train_name.append(name)
+    for test_label in test_labels:
+        name = str(classe)+'_'+str(test_label)+'_'+'s.bmp'
+        test_name.append(name)
+        
+    with open(os.getcwd()+'/training_names'+'.pickle', 'wb') as handle:  # save rgb to label dic
+        pickle.dump(train_name, handle, protocol=pickle.HIGHEST_PROTOCOL)
+    with open(os.getcwd()+'/Data/test_names'+'.pickle', 'wb') as handle:  # save rgb to label dic
+        pickle.dump(test_name, handle, protocol=pickle.HIGHEST_PROTOCOL)
+        
 #path = os.getcwd()
 #db_path = path + '/MSRC_ObjCategImageDatabase_v2'
 #Features_leaf_per_parent_label, Features_parent, labels_leaf, labels_parent = extract_features_labels(db_path)

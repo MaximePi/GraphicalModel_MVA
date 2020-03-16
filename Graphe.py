@@ -274,7 +274,7 @@ def add_features_to_parent(graph, parent, neigh):
     parent.feature.feature1high = list(feature1high/len(neigh))
 
 
-def create_segmentation_graph(graph,training):
+def create_segmentation_graph(graph,graph_path):
     
     ## features on leaf vertices shaped (num_classes,2*num_low_features) one line per label of the parents
     ## features on parent vertices shape (1,num_low_features)
@@ -286,6 +286,9 @@ def create_segmentation_graph(graph,training):
     ## adding low+high level features on leaves
     for leaf in graph.leaf_vertices:
         add_features_to_leaf(graph, leaf, graph.leaves_neighbours[leaf.get_id()])
+
+    with open(graph_path, 'wb') as handle: # save Graph
+        pickle.dump(graph, handle, protocol=pickle.HIGHEST_PROTOCOL)  
 
 def add_features_to_leaf(graph, leaf, neigh):
     #low
@@ -353,6 +356,7 @@ def add_features_to_leaf(graph, leaf, neigh):
             #graph.add_edge(new_leaf,parent_node)
             graph.delete_edge(leaf,parent_node)
 
+
 def labeling(graph:FSG,ground_truth,color_to_label:dict):
     ## Assign a label to the superpixel, dominant label in corresponding groundtruth region
     
@@ -400,23 +404,23 @@ def create_graph(db_path,color_to_label={}):
         os.mkdir(db_path+'/FSG_graphs')
     images_name = os.listdir(db_path+'/Images')
     images_name = [im for im in images_name if im!='Thumbs.db']
-    images_name = ['20_6_s.bmp']
+    images_name = ['8_21_s.bmp']
     #images_name = ['2_29_s.bmp','15_3_s.bmp','18_21_s.bmp'] # remove to process all images
     
 
     for image_name in images_name:
         print(image_name)
-        transformation_path = db_path+'\\Decomposed_Images'+'\\'+image_name.split('.')[0]
-        graph_path = db_path+'\\FSG_graphs'+'\\'+image_name.split('.')[0]
+        transformation_path = db_path+'/Decomposed_Images'+'/'+image_name.split('.')[0]
+        graph_path = db_path+'/FSG_graphs'+'/'+image_name.split('.')[0]
 
 #        if os.path.isdir(graph_path): # delete previous transfor
 #            shutil.rmtree(graph_path)
 #        os.mkdir(graph_path)
     
-        original_image = cv2.imread(db_path+'\\Images\\'+image_name)  # load image
-        ground_truth = cv2.imread(db_path+'\\GroundTruth\\'+image_name.split('.')[0]+'_GT.bmp')
+        original_image = cv2.imread(db_path+'/Images/'+image_name)  # load image
+        ground_truth = cv2.imread(db_path+'/GroundTruth/'+image_name.split('.')[0]+'_GT.bmp')
         
-        with open(transformation_path+'\\'+image_name.split('.')[0]+'.pickle', 'rb') as handle: # load decomposed image
+        with open(transformation_path+'/'+image_name.split('.')[0]+'.pickle', 'rb') as handle: # load decomposed image
             transformations = pickle.load(handle)
         
         G = create_initial_graph( original_image, transformations) # create graph
@@ -493,33 +497,3 @@ def refine_graph_for_graph_cut(edges, vertices, k):
 
     #step 4
     return Sq
-
-# k = 0.005
-# image =  cv2.imread("test2.jfif")
-# image = cv2.GaussianBlur(image, (5,5),1)
-# edges, vertices = create_graph_for_graph_cut(image, k=1., sigma=0.8, sz=1)
-# colors = refine_graph_for_graph_cut(edges, vertices, k)
-# color_graph(colors, image.shape[:2])
-    
-# path = os.getcwd()
-# db_path = path + '\\MSRC_ObjCategImageDatabase_v2'           
-# create_graph(db_path)  
-
-# DEbug
-            
-path = os.getcwd()
-db_path =""           
-image_name = '20_6_s.bmp'
-
-original_image = cv2.imread(image_name)  # load image
-ground_truth = cv2.imread(image_name.split('.')[0]+'_GT.bmp')
-transformation_path = image_name.split('.')[0]
-
-with open(image_name.split('.')[0]+'.pickle', 'rb') as handle: # load decomposed image
-    transformations = pickle.load(handle)
-        
-graph = create_initial_graph(original_image, transformations) # create graph
-color_to_label = {}
-color_to_label = labeling(graph,ground_truth,color_to_label)
-print(color_to_label)
-create_segmentation_graph(graph,True)
