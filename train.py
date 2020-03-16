@@ -15,15 +15,10 @@ def binarize_label(labels,m):
 
     return bin_labels
 
-def extract_features(db_path):
+def extract_features(db_path,images_name):
     
     with open(os.getcwd()+'/color_to_label'+'.pickle', 'rb') as handle: # load decomposed image
         color_to_label = pickle.load(handle)
-    
-    #images_name = os.listdir(db_path+'/Images')
-    #images_name = [im for im in images_name if im!='Thumbs.db']
-    #images_name = images_name[250:300]
-    images_name = ['2_28_s.bmp','4_8_s.bmp', '6_15_s.bmp'] # remove to process all images
 
 
     for image_name in images_name:
